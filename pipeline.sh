@@ -23,21 +23,30 @@ done
 #PycoQC, with guppy barcoding file
 # split summary sequencing files according to barcodes
 if [ ! "$(ls -A output/pycoqc)" ] ; then
-  singularity shell apps/pycoqc -c "Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/sequencing_summary_FAO06374_2bff58da.txt --output_dir output/pycoqc/"
+  singularity shell apps/pycoqc -c "Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/sequencing_summary_FAO06374_2bff58da.txt --output_dir output/pycoqc/ --force"
 for file in output/pycoqc/sequencing_summary_*; do
-  echo $file
   #get barcode name
-  barcode=$(echo $file | cut -d '_' -f 3 | cut -d '.' -f 1)
-  #create pycoQC html report per barcode
+  barcode=$(echo "$file" | cut -d '_' -f 3 | cut -d '.' -f 1)
+  #create pycoQC json report per barcode
   singularity shell apps/pycoqc -c "pycoQC -f ${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json"
   done
 else
   echo "Directory not empty - barcodes already split"
 fi
 
-singularity shell apps/multiqc -c "python -m multiqc output --outdir output/multiqc"
-pkill singularity
-# create pycoqc report
-#singularity shell apps/pycoqc -c "pycoQC -b data/sequencing_summary_FAO06374_2bff58da.txt " \
- #                                 "–f data/final_summary_FAO06374_2bff58da.txt " \
-  #                                "-o output/pycoQC_output.html -j output/pycoQC_output.json"
+# HUMAN READ REMOVAL -------------------------------------------------------------------------------------------
+ref=/home/rachel/outbreak_pipeline/data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna
+for file in /home/rachel/outbreak_pipeline/data/sample_fasta/*; do
+  # select run  name
+  run_name=$(echo "$file" | cut -d '.' -f 1 | rev | cut -d '/' -f 1 | rev)
+  # align reads to human reference genome
+  singularity shell apps/minimap2 -c "minimap2 -ax map-ont $ref $file > output/human_read_removal/${run_name}_aligned.sam"
+  # export unassigned reads to bam file with samtools
+  #singularity shell apps/samtools -c "samtools view -f 4 file.bam > unmapped.sam"
+done
+# align reads using ont-specific parameters
+
+
+# MULTIQC ------------------------------------------------------------------------------------------------------
+# create multiqc report, pulling in outputs from other tools
+#singularity shell apps/multiqc -c "python -m multiqc output --outdir output/multiqc"
