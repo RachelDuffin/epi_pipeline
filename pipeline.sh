@@ -49,4 +49,4 @@ done
 
 # MULTIQC ------------------------------------------------------------------------------------------------------
 # create multiqc report, pulling in outputs from other tools
-#singularity shell apps/multiqc -c "python -m multiqc output --outdir output/multiqc"
+singularity shell apps/multiqc -c "python -m multiqc output --outdir output/multiqc"
