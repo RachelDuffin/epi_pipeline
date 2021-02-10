@@ -5,6 +5,22 @@ source venv/bin/activate
 # Install containers
 ./install_containers.sh
 
+# Create output directories
+output_directories=(
+    fastqc \
+    pycoqc \
+    human_read_removal
+)
+
+for i in "${output_directories[@]}"; do
+    if [ -d "/path/to/dir" ];then
+        mkdir output/${i}
+        echo "output folder ${i} created"
+    else 
+        echo "${i} directory already exists"
+    fi
+done
+
 # DATA ANALYSIS ==============================================================================================
 # FASTQC -----------------------------------------------------------------------------------------------------
 # for each fastq file
@@ -15,7 +31,7 @@ for i in S54 S62; do
     echo "FastQC output for ${file} already exists"
   else
     echo "Creating fastqc file for ${file}"
-    singularity shell apps/fastqc -c "fastqc data/${i}_24hrs.fq -o output/fastqc"
+    singularity exec -c apps/fastqc "fastqc data/${i}_24hrs.fq -o output/fastqc"
   fi
 done
 
