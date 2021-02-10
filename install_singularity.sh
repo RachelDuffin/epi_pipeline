@@ -1,8 +1,8 @@
 # INSTALL SINGULARITY
 VERSION=3.5.3 # singularity version
-v="singularity --version"
+v="$(singularity --version)"
 
-if v='singularity version 3.5.3'; then
+if $v='singularity version 3.5.3'; then
   echo "singularity v3.5.3 already installed"
 else
   # Install dependencies
