@@ -1,11 +1,7 @@
-# Activate virtual environment
-# Install singularity
-module load apps/singularity
 # Install containers
-./install_containers.sh
-
-source venv/bin/activate
-sudo singularity config global --set 'mount tmp' no
+python3 install_containers.py
+# Load singularity
+module load apps/singularity
 
 # Create output directories
 output_directories=(
