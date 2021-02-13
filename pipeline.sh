@@ -1,6 +1,6 @@
 # Activate virtual environment
 # Install singularity
-sudo ./install_singularity.sh
+module load apps/singularity
 # Install containers
 ./install_containers.sh
 
