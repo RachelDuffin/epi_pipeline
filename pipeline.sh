@@ -1,9 +1,11 @@
 # Activate virtual environment
-source venv/bin/activate
 # Install singularity
-./install_singularity.sh
+sudo ./install_singularity.sh
 # Install containers
 ./install_containers.sh
+
+source venv/bin/activate
+sudo singularity config global --set 'mount tmp' no
 
 # Create output directories
 output_directories=(
@@ -13,13 +15,21 @@ output_directories=(
 )
 
 for i in "${output_directories[@]}"; do
-    if [ -d "/path/to/dir" ];then
-        mkdir output/${i}
-        echo "output folder ${i} created"
-    else 
+    if [ -d "output/${i}" ];then
         echo "${i} directory already exists"
+    else
+        mkdir output/${i}
+        echo "output folder ${i} created"  
     fi
 done
+
+# get current working directory
+wd=$(pwd)
+
+#set singularity bind paths to bind data on the host to the containers
+#export SINGULARITY_BIND="${wd}/output,${wd}/data,${wd},${wd}/output/fastqc"
+export SINGULARITY_SHELL=/bin/bash
+export LANG=en_GB.UTF-8
 
 # DATA ANALYSIS ==============================================================================================
 # FASTQC -----------------------------------------------------------------------------------------------------
@@ -31,7 +41,7 @@ for i in S54 S62; do
     echo "FastQC output for ${file} already exists"
   else
     echo "Creating fastqc file for ${file}"
-    singularity exec -c apps/fastqc "fastqc data/${i}_24hrs.fq -o output/fastqc"
+    sudo singularity exec apps/fastqc.sif fastqc data/${i}_24hrs.fq -o output/fastqc
   fi
 done
 
@@ -39,12 +49,12 @@ done
 #PycoQC, with guppy barcoding file
 # split summary sequencing files according to barcodes
 if [ ! "$(ls -A output/pycoqc)" ] ; then
-  singularity shell apps/pycoqc -c "Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/sequencing_summary_FAO06374_2bff58da.txt --output_dir output/pycoqc/ --force"
+  singularity exec apps/pycoqc Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/sequencing_summary_FAO06374_2bff58da.txt --output_dir output/pycoqc/ --force
 for file in output/pycoqc/sequencing_summary_*; do
   #get barcode name
   barcode=$(echo "$file" | cut -d '_' -f 3 | cut -d '.' -f 1)
   #create pycoQC json report per barcode
-  singularity shell apps/pycoqc -c "pycoQC -f ${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json"
+  singularity exec apps/pycoqc.sif pycoQC -f ${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json
   done
 else
   echo "Directory not empty - barcodes already split"
@@ -56,7 +66,7 @@ for file in /home/rachel/outbreak_pipeline/data/sample_fasta/*; do
   # select run  name
   run_name=$(echo "$file" | cut -d '.' -f 1 | rev | cut -d '/' -f 1 | rev)
   # align reads to human reference genome
-  singularity shell apps/minimap2 -c "minimap2 -ax map-ont $ref $file > output/human_read_removal/${run_name}_aligned.sam"
+  singularity exec apps/minimap2.sif minimap2 -ax map-ont $ref $file > output/human_read_removal/${run_name}_aligned.sam
   # export unassigned reads to bam file with samtools
   #singularity shell apps/samtools -c "samtools view -f 4 file.bam > unmapped.sam"
 done
@@ -65,4 +75,4 @@ done
 
 # MULTIQC ------------------------------------------------------------------------------------------------------
 # create multiqc report, pulling in outputs from other tools
-singularity shell apps/multiqc -c "python -m multiqc output --outdir output/multiqc"
+singularity exec apps/multiqc.sif python -m multiqc output --outdir output/multiqc
