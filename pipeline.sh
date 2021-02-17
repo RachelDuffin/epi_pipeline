@@ -1,3 +1,4 @@
+#!/bin/bash
 # Install containers
 python3 install_containers.py
 # Load singularity
@@ -19,14 +20,6 @@ for i in "${output_directories[@]}"; do
     fi
 done
 
-# get current working directory
-wd=$(pwd)
-
-#set singularity bind paths to bind data on the host to the containers
-#export SINGULARITY_BIND="${wd}/output,${wd}/data,${wd},${wd}/output/fastqc"
-export SINGULARITY_SHELL=/bin/bash
-export LANG=en_GB.UTF-8
-
 # DATA ANALYSIS ==============================================================================================
 # FASTQC -----------------------------------------------------------------------------------------------------
 # for each fastq file
@@ -43,10 +36,10 @@ done
 
 # PYCOQC ------------------------------------------------------------------------------------------------------
 #PycoQC, with guppy barcoding file
-# split summary sequencing files according to barcodes
+# if not yet split, split the summary sequencing files according to barcodes
 if [ ! "$(ls -A output/pycoqc)" ] ; then
-  for file in output/pycoqc/sequencing_summary_*; do
-    # if there are no files present in the output directory, split the barcodes
+  echo "Summary sequencing files not yet split"
+  for file in data/sequencing_summary_*; do
     echo "Splitting summary sequencing file ${file} according to barcodes"
     singularity exec apps/pycoqc.sif Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/${file} --output_dir output/pycoqc/
   done
@@ -61,7 +54,6 @@ for file in output/pycoqc/sequencing_summary_*; do
   echo "Creating pycoQC json report for ${file}"
   singularity exec apps/pycoqc.sif pycoQC -f data/${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json
   done
-
 
 # HUMAN READ REMOVAL -------------------------------------------------------------------------------------------
 ref=/home/rachel/outbreak_pipeline/data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna
