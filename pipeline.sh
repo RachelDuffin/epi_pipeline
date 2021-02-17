@@ -45,7 +45,7 @@ done
 #PycoQC, with guppy barcoding file
 # split summary sequencing files according to barcodes
 if [ ! "$(ls -A output/pycoqc)" ] ; then
-  singularity exec apps/pycoqc Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/sequencing_summary_FAO06374_2bff58da.txt --output_dir output/pycoqc/ --force
+  singularity exec apps/pycoqc.sif Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/sequencing_summary_FAO06374_2bff58da.txt --output_dir output/pycoqc/
 for file in output/pycoqc/sequencing_summary_*; do
   #get barcode name
   barcode=$(echo "$file" | cut -d '_' -f 3 | cut -d '.' -f 1)
