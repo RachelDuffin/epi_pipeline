@@ -45,16 +45,23 @@ done
 #PycoQC, with guppy barcoding file
 # split summary sequencing files according to barcodes
 if [ ! "$(ls -A output/pycoqc)" ] ; then
-  singularity exec apps/pycoqc.sif Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/sequencing_summary_FAO06374_2bff58da.txt --output_dir output/pycoqc/
+  for file in output/pycoqc/sequencing_summary_*; do
+    # if there are no files present in the output directory, split the barcodes
+    echo "Splitting summary sequencing file ${file} according to barcodes"
+    singularity exec apps/pycoqc.sif Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/${file} --output_dir output/pycoqc/
+  done
+else
+    echo "Directory not empty - barcodes already split"
+fi
+# Create pycoQC json report per barcode
 for file in output/pycoqc/sequencing_summary_*; do
   #get barcode name
   barcode=$(echo "$file" | cut -d '_' -f 3 | cut -d '.' -f 1)
   #create pycoQC json report per barcode
+  echo "Creating pycoQC json report for ${file}"
   singularity exec apps/pycoqc.sif pycoQC -f data/${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json
   done
-else
-  echo "Directory not empty - barcodes already split"
-fi
+
 
 # HUMAN READ REMOVAL -------------------------------------------------------------------------------------------
 ref=/home/rachel/outbreak_pipeline/data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna
@@ -62,7 +69,8 @@ for file in /home/rachel/outbreak_pipeline/data/sample_fasta/*; do
   # select run  name
   run_name=$(echo "$file" | cut -d '.' -f 1 | rev | cut -d '/' -f 1 | rev)
   # align reads to human reference genome
-  singularity exec apps/minimap2.sif minimap2 -ax map-ont $ref $file > output/human_read_removal/${run_name}_aligned.sam
+  echo "Aligning reads to human reference genome for ${file}"
+  singularity exec apps/minimap2.sif minimap2 -ax map-ont ${ref} data/${file} > output/human_read_removal/${run_name}_aligned.sam
   # export unassigned reads to bam file with samtools
   #singularity shell apps/samtools -c "samtools view -f 4 file.bam > unmapped.sam"
 done
@@ -74,4 +82,5 @@ done
 
 # MULTIQC ------------------------------------------------------------------------------------------------------
 # create multiqc report, pulling in outputs from other tools
+echo "Creating MultiQC report for the analysis"
 singularity exec apps/multiqc.sif python -m multiqc output --outdir output/multiqc
