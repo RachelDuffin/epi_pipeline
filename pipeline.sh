@@ -41,7 +41,7 @@ if [ ! "$(ls -A output/pycoqc)" ] ; then
   echo "Summary sequencing files not yet split"
   for file in data/sequencing_summary_*; do
     echo "Splitting summary sequencing file ${file} according to barcodes"
-    singularity exec apps/pycoqc.sif Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file data/${file} --output_dir output/pycoqc/
+    singularity exec apps/pycoqc.sif Barcode_split --output_unclassified --min_barcode_percent 0.0 --summary_file ${file} --output_dir output/pycoqc/
   done
 else
     echo "Directory not empty - barcodes already split"
@@ -50,27 +50,24 @@ fi
 for file in output/pycoqc/sequencing_summary_*; do
   #get barcode name
   barcode=$(echo "$file" | cut -d '_' -f 3 | cut -d '.' -f 1)
-  #create pycoQC json report per barcode
   echo "Creating pycoQC json report for ${file}"
-  singularity exec apps/pycoqc.sif pycoQC -f data/${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json
+  singularity exec apps/pycoqc.sif pycoQC -f ${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json
   done
 
 # HUMAN READ REMOVAL -------------------------------------------------------------------------------------------
-ref=/home/rachel/outbreak_pipeline/data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna
-for file in /home/rachel/outbreak_pipeline/data/sample_fasta/*; do
+ref=data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna
+for file in data/*.fq; do
   # select run  name
   run_name=$(echo "$file" | cut -d '.' -f 1 | rev | cut -d '/' -f 1 | rev)
   # align reads to human reference genome
   echo "Aligning reads to human reference genome for ${file}"
-  singularity exec apps/minimap2.sif minimap2 -ax map-ont ${ref} data/${file} > output/human_read_removal/${run_name}_aligned.sam
+  singularity exec apps/minimap2.sif minimap2 -ax map-ont ${ref} ${file} > output/human_read_removal/${run_name}_aligned.sam
   # export unassigned reads to bam file with samtools
   #singularity shell apps/samtools -c "samtools view -f 4 file.bam > unmapped.sam"
 done
 # align reads using ont-specific parameters
 
-
 # minimap2 for mapping alignment, bcftools consensus generation, SNP-sites to identify SNPs between samples, multi-locus sequence typing using MLST, and SNP-dists to calculate SNP distances.1
-
 
 # MULTIQC ------------------------------------------------------------------------------------------------------
 # create multiqc report, pulling in outputs from other tools
