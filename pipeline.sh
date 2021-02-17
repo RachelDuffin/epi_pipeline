@@ -50,7 +50,7 @@ for file in output/pycoqc/sequencing_summary_*; do
   #get barcode name
   barcode=$(echo "$file" | cut -d '_' -f 3 | cut -d '.' -f 1)
   #create pycoQC json report per barcode
-  singularity exec apps/pycoqc.sif pycoQC -f ${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json
+  singularity exec apps/pycoqc.sif pycoQC -f data/${file}  --json_outfile output/pycoqc/${barcode}_pycoQC_output.json
   done
 else
   echo "Directory not empty - barcodes already split"
