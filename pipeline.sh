@@ -37,7 +37,7 @@ for i in S54 S62; do
     echo "FastQC output for ${file} already exists"
   else
     echo "Creating fastqc file for ${file}"
-    sudo singularity exec apps/fastqc.sif fastqc data/${i}_24hrs.fq -o output/fastqc
+    singularity exec apps/fastqc.sif fastqc data/${i}_24hrs.fq -o output/fastqc
   fi
 done
 
@@ -67,6 +67,9 @@ for file in /home/rachel/outbreak_pipeline/data/sample_fasta/*; do
   #singularity shell apps/samtools -c "samtools view -f 4 file.bam > unmapped.sam"
 done
 # align reads using ont-specific parameters
+
+
+# minimap2 for mapping alignment, bcftools consensus generation, SNP-sites to identify SNPs between samples, multi-locus sequence typing using MLST, and SNP-dists to calculate SNP distances.1
 
 
 # MULTIQC ------------------------------------------------------------------------------------------------------
