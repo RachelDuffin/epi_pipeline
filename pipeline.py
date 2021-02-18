@@ -8,7 +8,7 @@ def get_identifier(runfolder, file, string):
     """
     Gets the run id from the run's final_summary file
     """
-    with open("data/run_folders/" + runfolder + "/" + file, "rt") as file_contents:
+    with open("data/run_folders/" + str(runfolder) + "/" + str(file), "rt") as file_contents:
         lines = file_contents.readlines()
         for line in lines:
             if line.__contains__(string):
