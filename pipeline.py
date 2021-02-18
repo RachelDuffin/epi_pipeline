@@ -8,7 +8,7 @@ def get_identifier(runfolder, file, string):
     """
     Gets the run id from the run's final_summary file
     """
-    with open("data/run_folders/" + str(runfolder) + "/" + str(file), "rt") as file_contents:
+    with open("data/run_folders/" + runfolder + "/" + file, "rt") as file_contents:
         lines = file_contents.readlines()
         for line in lines:
             if line.__contains__(string):
@@ -108,7 +108,7 @@ def main():
     subprocess.run("module load apps/singularity", shell=True)
     for directory in os.listdir("data/run_folders"):
         if os.path.isdir("data/run_folders/" + directory):
-            run_id = get_identifier(runfolder=dir, file="final_summary_*.txt", string="sample_id=")
+            run_id = get_identifier(runfolder=directory, file="final_summary_*.txt", string="sample_id=")
             # create output directory per run, and subdirectories for outputs from each tool
             create_directory(parent_directory="output", directory_list=run_id)
             sub_directories = ["fastqc", "pycoqc", "human_read_removal"]
