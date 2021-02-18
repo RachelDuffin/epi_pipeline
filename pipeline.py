@@ -108,7 +108,8 @@ def main():
     subprocess.run("module load apps/singularity", shell=True)
     for directory in os.listdir("data/run_folders"):
         if os.path.isdir("data/run_folders/" + directory):
-            run_id = get_identifier(runfolder=directory, file="final_summary_*.txt", string="sample_id=")
+            summary_file=glob.glob("data/run_folders/" + directory + "final_summary_*.txt")
+            run_id = get_identifier(runfolder=directory, file=summary_file, string="sample_id=")
             # create output directory per run, and subdirectories for outputs from each tool
             create_directory(parent_directory="output", directory_list=run_id)
             sub_directories = ["fastqc", "pycoqc", "human_read_removal"]
