@@ -1,6 +1,7 @@
 import glob
 import os
 import subprocess
+import install_containers
 
 
 def get_identifier(runfolder, file, string):
@@ -102,7 +103,7 @@ def multiqc():
 
 def main():
     # Install containers
-    subprocess.run("python3 install_containers.py", shell=True)
+    install_containers.install_tools()
     # Load singularity
     subprocess.run("module load apps/singularity", shell=True)
     for directory in os.listdir("data/run_folders"):

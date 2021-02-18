@@ -16,12 +16,13 @@ app_dictionary = {
 }
 save_location = "apps"
 
-# Install tools
-print("--------------------------\nInstalling pipeline tools")
-for key in app_dictionary:
-    if os.path.exists(save_location + "/" + key):
-        print(key + " already installed")
-    else:
-        print("Installing " + key)
-        os.system("singularity pull --dir " + save_location + " " + app_dictionary[key])
-print("----------------------------")
+
+def install_tools():
+    print("--------------------------\nInstalling pipeline tools")
+    for key in app_dictionary:
+        if os.path.exists(save_location + "/" + key):
+            print(key + " already installed")
+        else:
+            print("Installing " + key)
+            os.system("singularity pull --dir " + save_location + " " + app_dictionary[key])
+    print("----------------------------")
