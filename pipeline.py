@@ -1,5 +1,6 @@
 import glob
 import os
+import subprocess
 
 
 def get_identifier(runfolder, file, string):
@@ -36,7 +37,7 @@ def fastqc(run_folder, run_id):
         print("FastQC output for run " + run_id + " already exists")
     else:
         print("Creating fastqc file for run " + run_id)
-        os.system(
+        subprocess.run(
             "singularity exec apps/fastqc.sif fastqc data/run_folders/" + run_folder + "_24hrs.fq -o output/fastqc")
 
 
@@ -54,9 +55,9 @@ def pycoqc(run_folder):
 
     for file in glob.glob("output/" + run_folder + "/pycoqc/sequencing_summary_*"):
         # get barcode name from barcode_split output file names
-        barcode = os.system("echo " + file + " | cut -d '_' -f 3 | cut -d '.' -f 1")
+        barcode = subprocess.run("echo " + file + " | cut -d '_' -f 3 | cut -d '.' -f 1")
         print("Creating pycoQC json report for " + file)
-        os.system(
+        subprocess.run(
             "singularity exec apps/pycoqc.sif pycoQC -f " + file +
             " --json_outfile output/" + run_folder + "/pycoqc/" + barcode + "_pycoQC_output.json")
 
@@ -64,7 +65,7 @@ def pycoqc(run_folder):
 def split_barcodes(run_folder):
     for file in glob.glob("data/run_folders/" + run_folder + "/sequencing_summary_*"):
         print("Splitting summary sequencing file " + file + " according to barcodes")
-        os.system(
+        subprocess.run(
             "singularity exec apps/pycoqc.sif Barcode_split --output_unclassified --min_barcode_percent 0.0 " +
             "--summary_file " + "data/run_folders/" + run_folder + "/" + file + " --output_dir output/pycoqc/")
 
@@ -78,7 +79,7 @@ def human_read_removal(ref, run_folder, run_id):
         barcode = get_identifier(runfolder=run_folder, file=file, string="barcode")
         # align reads to human reference genome
         print("Aligning reads to human reference genome for " + file)
-        os.system(
+        subprocess.run(
             "singularity exec apps/minimap2.sif minimap2 -ax map-ont " + ref + file +
             " > output/human_read_removal/" + run_id + "_" + barcode + "_aligned.sam")
         # export unassigned reads to bam file with samtools
@@ -95,14 +96,14 @@ def multiqc():
     Create MultiQC report, pulling in outputs from other tools
     """
     print("Creating MultiQC report for the analysis")
-    os.system("singularity exec apps/multiqc.sif python -m multiqc output --outdir output/multiqc")
+    subprocess.run("singularity exec apps/multiqc.sif python -m multiqc output --outdir output/multiqc")
 
 
 def main():
     # Install containers
-    os.system("python3 install_containers.py")
+    subprocess.run("python3 install_containers.py")
     # Load singularity
-    os.system("module load apps/singularity")
+    subprocess.run("module load apps/singularity")
     for directory in os.listdir("data/run_folders"):
         if os.path.isdir(directory):
             run_id = get_identifier(runfolder=dir, file="final_summary_*.txt", string="sample_id=")
