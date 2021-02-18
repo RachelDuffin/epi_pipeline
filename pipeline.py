@@ -107,7 +107,7 @@ def main():
     # Load singularity
     subprocess.run("module load apps/singularity", shell=True)
     for directory in os.listdir("data/run_folders"):
-        if os.path.isdir(directory):
+        if os.path.isdir("data/run_folders" + directory):
             run_id = get_identifier(runfolder=dir, file="final_summary_*.txt", string="sample_id=")
             # create output directory per run, and subdirectories for outputs from each tool
             create_directory(parent_directory="output", directory_list=run_id)
