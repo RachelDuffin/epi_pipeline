@@ -13,10 +13,10 @@ def get_identifier(file, string):
         lines = file_contents.readlines()
         for line in lines:
             if line.__contains__(string):
-                id = (line.split("=", 1))[1]
+                selected = (line.split("=", 1))[1]
     if ".fq" in file:
-        id = id.split()[-1].split("=")[-1]
-    identifier = id
+        selected = selected.split()[-1].split("=")[-1]
+    identifier = selected
     return identifier
 
 
@@ -88,21 +88,57 @@ def human_read_removal(ref, run_folder, run_id):
     print("--------------------------\nHUMAN READ REMOVAL\n--------------------------")
     for file in glob.glob("data/run_folders/" + run_folder + "/*.fq"):
         barcode = get_identifier(file=file, string="barcode")
-        # align reads to human reference genome
-        print("Aligning reads to human reference genome for " + file)
+        if os.path.isfile("output/" + run_folder + "/human_read_removal/" + run_folder + "_" + barcode + "_aligned.sam"):
+            print(barcode + " already aligned")
+        else:
+            # align reads to human reference genome using ont-specific parameters
+            print("Aligning reads to human reference genome for " + file)
+            subprocess.run(
+                "module load apps/singularity; singularity exec apps/minimap2.sif minimap2 -ax map-ont " + ref + " " +
+                file + " > output/" + run_folder + "/human_read_removal/" + run_id + "_" + barcode + "_aligned.sam",
+                shell=True)
+        # import SAM to BAM as @SQ lines present in header, only import unassigned reads (non-human)
+        print("Import non-human reads as BAM file for output/" + run_folder + "/human_read_removal/" + run_id + "_"
+              + barcode + "_aligned.sam")
         subprocess.run(
-            "module load apps/singularity; singularity exec apps/minimap2.sif minimap2 -ax map-ont " + ref + " " +
-            file + " > output/" + run_folder + "/human_read_removal/" + run_id + "_" + barcode + "_aligned.sam",
-            shell=True)
+            "module load apps/singularity; singularity exec apps/samtools.sif samtools view -bS -f 4 " + "output/" +
+            run_folder + "/human_read_removal/" + run_id + "_" + barcode + "_aligned.sam" + " > " + "output/" +
+            run_folder + "/human_read_removal/" + run_id + "_" + barcode + "_unmapped.bam", shell=True)
+        # convert bam to fastq file
+        print("Convert bam to fastq file for Import non-human reads as BAM file for output/" +
+            run_folder + "/human_read_removal/" + run_id + "_" + barcode + "_unmapped.bam")
+        subprocess.run(
+            "module load apps/singularity; singularity exec apps/samtools.sif samtools bam2fq output/" +
+            run_folder + "/human_read_removal/" + run_id + "_" + barcode + "_unmapped.bam > output/" +
+            run_folder + "/human_read_removal/" + run_id + "_" + barcode + "_unmapped.fastq", shell=True)
     print("--------------------------")
-        # export unassigned reads to bam file with samtools
-        # singularity shell apps/samtools -c "samtools view -f 4 file.bam > unmapped.sam"
-
-        # align reads using ont-specific parameters
 
         # minimap2 for mapping alignment, bcftools consensus generation, SNP-sites to identify SNPs between samples
         # multi-locus sequence typing using MLST, and SNP-dists to calculate SNP distances.1
 
+def de_novo_assembly():
+    pass
+
+def mapping_assembly():
+    pass
+
+def consensus_generation():
+    pass
+
+def variant_calling():
+    pass
+
+def genetic_distance():
+    pass
+
+def mlst():
+    pass
+
+def snp_based_typing():
+    pass
+
+def report_generation():
+    pass
 
 def multiqc():
     """
@@ -117,9 +153,9 @@ def main():
     # Install containers
     install_containers.install_tools()
     # Load singularity
-    for entry in os.listdir("data/run_folders"):
-        if os.path.isdir("data/run_folders/" + entry):
-            for summary_file in glob.glob("data/run_folders/" + entry + "/final_summary_*.txt"):
+    for run in os.listdir("data/run_folders"):
+        if os.path.isdir("data/run_folders/" + run):
+            for summary_file in glob.glob("data/run_folders/" + run + "/final_summary_*.txt"):
                 run_id = get_identifier(file=summary_file, string="sample_id=").rstrip("\n")
                 # create output directory per run, and subdirectories for outputs from each tool
                 create_directory(parent_directory="output", directory=run_id)
@@ -127,11 +163,11 @@ def main():
                 for i in sub_directories:
                     create_directory(parent_directory="output/" + run_id, directory=i)
                 # Conduct fastQC analysis
-                fastqc(run_folder=entry, run_id=run_id)
+                fastqc(run_folder=run, run_id=run_id)
                 # Conduct pycoQC analysis
-                pycoqc(run_folder=entry)
+                pycoqc(run_folder=run)
                 reference_genome = "data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna"
-                human_read_removal(ref=reference_genome, run_folder=entry, run_id=run_id)
+                human_read_removal(ref=reference_genome, run_folder=run, run_id=run_id)
 
 
 if __name__ == '__main__':
