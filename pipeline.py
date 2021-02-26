@@ -115,8 +115,8 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
             # remove intermediary file
             os.remove(out_path + "_unmapped.bam")
             # calculate % aligned reads to human reference genome
-            subprocess.run("module load apps/singularity; singularity exec apps/samtools.sif samtools stats " +
-                            out_path + "_aligned.sam", shell=True)
+            subprocess.run("module load apps/singularity; singularity exec apps/samtools.sif samtools stats " + out_path
+                           + "_aligned.sam | grep ^SN | cut -f 2- > " + out_path + "_samtools_stats.txt", shell=True)
     print("--------------------------")
 
 
@@ -166,9 +166,15 @@ def split_files(data_dir, out_dir, run_id, cwd):
             subprocess.run("module load apps/singularity; singularity exec " + cwd + "/apps/pyfaidx.sif faidx " +
                            "--split-files " + cwd + "/" + assembly_directory + "/assembly.fasta", shell=True)
             os.chdir(cwd)
+            for file in glob.glob(assembly_directory + "/pyfaidx_split_contigs"):
+                append_id(filename=file, uid=run_id + "_" + barcode)
         else:
             print("Assembly already split for " + barcode)
     print("--------------------------")
+    
+def append_id(filename, uid):
+    name, ext = os.path.splitext(filename)
+    return "{uid}_{name}{ext}".format(name=name, uid=uid, ext=ext)
 
 def mlst(data_dir, out_dir, run_id, cwd):
     """
@@ -201,8 +207,8 @@ def variant_calling(out_dir, run_id):
     print(out_dir)
     print(run_id)
     # SNP-sites to identify SNPs between samples
-    subprocess.run("module load apps/singularity; singularity exec apps/snp-sites.sif snp-sites -m -o OUTPUT_FILENAME "
-                   "INPUT_FILENAME", shell=True)
+    subprocess.run("module load apps/singularity; singularity exec apps/snp-sites.sif snp-sites -m -o " +
+                   OUTPUT_FILENAME + " " + INPUT_FILENAME, shell=True)
     print("--------------------------")
     pass
 
@@ -210,8 +216,8 @@ def variant_calling(out_dir, run_id):
 def genetic_distance(out_dir, run_id):
     print("--------------------------\nGENETIC DISTANCE CALCULATION\n--------------------------")
     # SNP-dists to calculate SNP distances
-    subprocess.run("module load apps/singularity; singularity exec apps/snp-dists.sif snp-dists INPUT_FILENAME > "
-                   "OUTPUT_FILENAME.tsv", shell=True)
+    subprocess.run("module load apps/singularity; singularity exec apps/snp-dists.sif snp-dists " + INPUT_FILENAME  +
+                   " > " + OUTPUT_FILENAME.tsv, shell=True)
     print("--------------------------")
     pass
 
