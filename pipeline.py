@@ -3,7 +3,7 @@ import os
 import re
 import subprocess
 import sys
-
+import shutil
 import install_containers
 
 
@@ -39,16 +39,16 @@ def fastqc(data_dir, out_dir, run_id):
     FastQC analysis per run folder
     """
     print("--------------------------\nFASTQC\n--------------------------")
-    output_filename = run_id + "_24hrs_fastqc.html"
-    # if output file already present, do not re-analyse
-    if os.path.isfile(out_dir + "/fastqc/" + output_filename):
-        print("FastQC output for run " + run_id + " already exists")
-    else:
-        print("Creating fastqc file for run " + run_id)
-        for file in glob.glob(data_dir + "/*_24hrs.fq"):
-            barcode = get_identifier(file=file, string="barcode")
+    for file in glob.glob(data_dir + "/*.fq"):
+        barcode = get_identifier(file=file, string="barcode")
+        output_filename = run_id + "_" + barcode + "_fastqc.html"
+        # if output file already present, do not re-analyse
+        if os.path.isfile(out_dir + "/fastqc/" + output_filename):
+            print("FastQC output for run " + run_id + " already exists")
+        else:
+            print("Creating fastqc file for run " + run_id)
             subprocess.run("module load apps/singularity; singularity exec apps/fastqc.sif fastqc " + file + " -o " +
-                           out_dir + "/fastqc", shell=True)
+                            out_dir + "/fastqc", shell=True)
     print("--------------------------")
 
 
@@ -114,6 +114,9 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
                 "_unmapped.bam > " + out_path + "_unmapped.fastq", shell=True)
             # remove intermediary file
             os.remove(out_path + "_unmapped.bam")
+            # calculate % aligned reads to human reference genome
+            subprocess.run("module load apps/singularity; singularity exec apps/samtools.sif samtools stats " +
+                            out_path + "_aligned.sam", shell=True)
     print("--------------------------")
 
 
@@ -131,7 +134,11 @@ def de_novo_assembly(data_dir, out_dir, run_id):
                 print("De novo assembly already complete for " + barcode)
             else:
                 print("Performing de novo assembly for " + file)
-                create_directory(parent_directory=out_dir + "/de_novo_assembly", directory=run_id + "_" + barcode)
+                parent_directory = out_dir + "/de_novo_assembly"
+                directory = run_id + "_" + barcode
+                create_directory(parent_directory = parent_directory, directory = directory)
+                create_directory(parent_directory= parent_directory + "/" + directory,
+                                  directory = "pyfaidx_split_contigs")
                 print("Conducting de novo assembly for " + file)
                 subprocess.run("module load apps/singularity; singularity exec apps/flye.sif flye --nano-raw " +
                                 file + " --out-dir " + out_dir + "/de_novo_assembly/" + run_id + "_" + barcode +
@@ -148,19 +155,64 @@ def consensus_generation():
     # bcftools consensus generation
     pass
 
+def split_files(data_dir, out_dir, run_id, cwd):
+    print("--------------------------\nSPLIT ASSEMBLY INTO CONTIGS\n--------------------------")
+    for data_input in glob.glob(data_dir + "/*.fq"):
+        barcode = get_identifier(file=data_input, string="barcode")
+        assembly_directory = out_dir + "/de_novo_assembly/" + run_id + "_" + barcode
+        if not os.listdir(assembly_directory + "/pyfaidx_split_contigs"):
+            print("Splitting assembly for " + barcode + " into a file per contig")
+            os.chdir(assembly_directory + "/pyfaidx_split_contigs")
+            subprocess.run("module load apps/singularity; singularity exec " + cwd + "/apps/pyfaidx.sif faidx " +
+                           "--split-files " + cwd + "/" + assembly_directory + "/assembly.fasta", shell=True)
+            os.chdir(cwd)
+        else:
+            print("Assembly already split for " + barcode)
+    print("--------------------------")
 
-def variant_calling():
+def mlst(data_dir, out_dir, run_id, cwd):
+    """
+    Multi-locus sequence typing using MLST
+    """
+    split_files(data_dir, out_dir, run_id, cwd)
+    # FOR THIS TO WORK I THINK I WILL HAVE TO SPLIT THE ASSEMBLY FILE INTO INDIVIDUAL CONTIGS
+    print("--------------------------\nMULTI LOCUS SEQUENCE TYPING\n--------------------------")
+    for data_input in glob.glob(data_dir + "/*.fq"):
+        barcode = get_identifier(file=data_input, string="barcode")
+        fasta_input = out_dir + "/de_novo_assembly/" + run_id + "_" + barcode + "/assembly.fasta"
+        csv_output = out_dir + "/mlst/" + run_id + "_" + barcode + ".csv"
+        if os.path.exists(csv_output):
+            print("MLST already complete for " + barcode)
+        else:
+            print("Conducting MLST for " + barcode)
+            subprocess.run("module load apps/singularity; singularity exec apps/mlst.sif mlst " + fasta_input + " > " +
+                           csv_output, shell=True)
+    print("--------------------------")
+    pass
+
+
+def alignment():
+    """
+    Multi-fasta alignment of all contigs within
+    """
+
+def variant_calling(out_dir, run_id):
+    print("--------------------------\nVARIANT CALLING\n--------------------------")
+    print(out_dir)
+    print(run_id)
     # SNP-sites to identify SNPs between samples
+    subprocess.run("module load apps/singularity; singularity exec apps/snp-sites.sif snp-sites -m -o OUTPUT_FILENAME "
+                   "INPUT_FILENAME", shell=True)
+    print("--------------------------")
     pass
 
 
-def genetic_distance():
+def genetic_distance(out_dir, run_id):
+    print("--------------------------\nGENETIC DISTANCE CALCULATION\n--------------------------")
     # SNP-dists to calculate SNP distances
-    pass
-
-
-def mlst():
-    # multi-locus sequence typing using MLST
+    subprocess.run("module load apps/singularity; singularity exec apps/snp-dists.sif snp-dists INPUT_FILENAME > "
+                   "OUTPUT_FILENAME.tsv", shell=True)
+    print("--------------------------")
     pass
 
 
@@ -199,7 +251,8 @@ def main():
                 out_dir = "output/" + run
                 # create output directory per run, and subdirectories for outputs from each tool
                 create_directory(parent_directory="output", directory=run_id)
-                sub_directories = ["fastqc", "pycoqc", "human_read_removal", "de_novo_assembly"]
+                sub_directories = ["fastqc", "pycoqc", "human_read_removal", "de_novo_assembly", "mlst", "snp-sites",
+                                   "snp-dists"]
                 for i in sub_directories:
                     create_directory(parent_directory=out_dir, directory=i)
                 # Conduct QC analysis
@@ -209,6 +262,10 @@ def main():
                 reference_genome = "data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna"
                 human_read_removal(data_dir=data_dir, out_dir=out_dir, run_id=run_id, ref=reference_genome)
                 de_novo_assembly(data_dir=data_dir, out_dir=out_dir, run_id=run_id)
+                cwd = os.getcwd()
+                mlst(data_dir=data_dir, out_dir=out_dir, run_id=run_id, cwd=cwd)
+                #variant_calling(out_dir=out_dir, run_id=run_id)
+                #genetic_distance(out_dir=out_dir, run_id=run_id)
                 multiqc(out_dir=out_dir, run_id=run_id)
 
 

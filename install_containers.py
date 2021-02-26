@@ -7,11 +7,15 @@ app_dictionary = {
     "fastqc.sif": "docker://quay.io/biocontainers/fastqc:0.11.9--0",
     "multiqc.sif": "docker://quay.io/biocontainers/multiqc:1.9--py_1",
     "pycoqc.sif": "docker://quay.io/biocontainers/pycoqc:2.5.2--py_0",
-    "minimap2.sif": "docker://quay.io/biocontainers/minimap2:2.17--hed695b0_3",
-    "samtools.sif": "docker://quay.io/biocontainers/samtools:0.1.18--hfb9b9cc_10",
+    "minimap2.sif": "docker://quay.io/biocontainers/minimap2:2.9--1",
+    "samtools.sif": "docker://quay.io/biocontainers/samtools:1.11--h6270b1f_0",
     "bam2fastx.sif": "docker://quay.io/biocontainers/bam2fastx:1.3.1--he1c1bb9_0",
-    "medaka.sif": "docker://quay.io/biocontainers/medaka:1.2.1--py38hfcf0ad1_0",
-    "flye.sif" : "docker://quay.io/biocontainers/flye:2.8.3--py36h5202f60_0"
+    "medaka.sif": "docker://quay.io/biocontainers/medaka:1.2.3--py36hbcc4abb_0",
+    "flye.sif" : "docker://quay.io/biocontainers/flye:2.8.3--py36h5202f60_0",
+    "mlst.sif" : "docker://quay.io/biocontainers/mlst:2.19.0--0",
+    "snp-sites.sif" : "docker://quay.io/biocontainers/snp-sites:2.5.1--hed695b0_0",
+    "snp-dists.sif" : "docker://quay.io/biocontainers/snp-dists:0.7.0--hed695b0_0",
+    "pyfaidx.sif" : "docker://quay.io/biocontainers/pyfaidx:0.5.9.2--pyh3252c3a_0"
 }
 save_location = "apps"
 
