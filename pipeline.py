@@ -185,14 +185,14 @@ def mlst(data_dir, out_dir, run_id, cwd):
     print("--------------------------\nMULTI LOCUS SEQUENCE TYPING\n--------------------------")
     for data_input in glob.glob(data_dir + "/*.fq"):
         barcode = get_identifier(file=data_input, string="barcode")
-        fasta_input = out_dir + "/de_novo_assembly/" + run_id + "_" + barcode + "/assembly.fasta"
+        fasta_input = out_dir + "/de_novo_assembly/" + run_id + "_" + barcode + "/pyfaidx_split_contigs/*.fasta"
         csv_output = out_dir + "/mlst/" + run_id + "_" + barcode + ".csv"
         if os.path.exists(csv_output):
             print("MLST already complete for " + barcode)
         else:
             print("Conducting MLST for " + barcode)
-            subprocess.run("module load apps/singularity; singularity exec apps/mlst.sif mlst " + fasta_input + " > " +
-                           csv_output, shell=True)
+            subprocess.run("module load apps/singularity; singularity exec apps/mlst.sif mlst --debug " + fasta_input +
+                            " >> " + csv_output, shell=True)
     print("--------------------------")
     pass
 
