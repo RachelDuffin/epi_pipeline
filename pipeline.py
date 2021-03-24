@@ -5,6 +5,7 @@ import subprocess
 import sys
 import shutil
 import install_containers
+from install_containers import app_dictionary
 
 
 # SETTINGS
@@ -27,11 +28,11 @@ def create_directory(parent_directory, directory):
     """
     Create output directories
     """
-    if os.path.exists(parent_directory + "/" + directory):
-        print(directory + " directory already exists")
+    if os.path.exists("{}/{}".format(parent_directory, directory)):
+        print("{} directory already exists".format(directory))
     else:
         os.mkdir(os.path.join(parent_directory, directory))
-        print("output folder " + directory + " created")
+        print("output folder {} created".format(directory))
 
 
 def fastqc(data_dir, out_dir, run_id):
@@ -39,16 +40,17 @@ def fastqc(data_dir, out_dir, run_id):
     FastQC analysis per run folder
     """
     print("--------------------------\nFASTQC\n--------------------------")
-    for file in glob.glob(data_dir + "/*.fq"):
+    for file in glob.glob("{}/*.fq".format(data_dir)):
         barcode = get_identifier(file=file, string="barcode")
-        output_filename = run_id + "_" + barcode + "_fastqc.html"
+        output_filename = "{}_{}_fastqc.html".format(run_id, barcode)
         # if output file already present, do not re-analyse
-        if os.path.isfile(out_dir + "/fastqc/" + output_filename):
-            print("FastQC output for run " + run_id + " already exists")
+        if os.path.isfile("{}/fastqc/{}".format(out_dir, output_filename)):
+            print("FastQC output for run {} already exists".format(run_id))
         else:
-            print("Creating fastqc file for run " + run_id)
-            subprocess.run("module load apps/singularity; singularity exec apps/fastqc.sif fastqc " + file + " -o " +
-                            out_dir + "/fastqc", shell=True)
+            print("Creating FastQC file for run {}".format(run_id))
+            fastqc_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} fastqc {} -o " \
+                             "{}/fastqc".format(app_dictionary["fastqc"], file, out_dir)
+            subprocess.run(fastqc_command, shell=True)
     print("--------------------------")
 
 
@@ -59,28 +61,28 @@ def pycoqc(data_dir, out_dir):
     """
     print("--------------------------\nPYCOQC\n--------------------------")
     # If pycoQC not yet run, split the summary sequencing files according to barcodes and run pycoQC
-    if not os.listdir(out_dir + "/pycoqc"):
+    if not os.listdir("{}/pycoqc".format(out_dir)):
         print("pycoQC not yet run")
         split_barcodes(data_dir=data_dir, out_dir=out_dir)
-        for file in glob.glob(out_dir + "/pycoqc/sequencing_summary_*"):
+        for file in glob.glob("{}/pycoqc/sequencing_summary_*".format(out_dir)):
             # get barcode name from barcode_split output file names
             barcode = file.split(".", 1)[0].split("summary_", 1)[1]
-            print("Creating pycoQC json report for " + file)
-            subprocess.run(
-                "module load apps/singularity; singularity exec apps/pycoqc.sif pycoQC -f " + file +
-                " --json_outfile " + out_dir + "/pycoqc/" + barcode + "_pycoQC_output.json", shell=True)
+            print("Creating PycoQC json report for {}".format(file))
+            pycoqc_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} pycoQC -f {} --json_outfile " \
+                             "{}/pycoqc/{}_pycoQC_output.json".format(app_dictionary["pycoqc"], file, out_dir, barcode)
+            subprocess.run(pycoqc_command, shell=True)
     else:
         print("Directory not empty - pycoQC already run")
     print("--------------------------")
 
 
 def split_barcodes(data_dir, out_dir):
-    for file in glob.glob(data_dir + "/sequencing_summary_*"):
-        print("Splitting summary sequencing file " + file + " according to barcodes")
-        subprocess.run(
-            "module load apps/singularity; singularity exec apps/pycoqc.sif Barcode_split --output_unclassified " +
-            "--min_barcode_percent 0.0 --summary_file " + file + " --output_dir " + out_dir + "/pycoqc",
-            shell=True)
+    for file in glob.glob("{}/sequencing_summary_*".format(data_dir)):
+        print("Splitting summary sequencing file {} according to barcodes".format(file))
+        split_barcode_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} Barcode_split " \
+                                "--output_unclassified --min_barcode_percent 0.0 --summary_file {} --output_dir " \
+                                "{}/pycoqc".format(app_dictionary["pycoqc"], file, out_dir)
+        subprocess.run(split_barcode_command, shell=True)
 
 
 def human_read_removal(data_dir, out_dir, run_id, ref):
@@ -88,35 +90,42 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
     Removes human reads from the samples by alignment to the human reference genome.
     """
     print("--------------------------\nHUMAN READ REMOVAL\n--------------------------")
-    for file in glob.glob(data_dir + "/*.fq"):
+    for file in glob.glob("{}/*.fq".format(data_dir)):
         barcode = get_identifier(file=file, string="barcode")
-        out_path = out_dir + "/human_read_removal/" + run_id + "_" + barcode
-        if os.path.isfile(out_path + "_aligned.sam"):
-            print(barcode + " already aligned")
+        out_path = "{}/human_read_removal/{}_{}".format(out_dir, run_id, barcode)
+        if os.path.isfile("{}_aligned.sam".format(out_path)):
+            print("{} already aligned".format(barcode))
         else:
             # align reads to human reference genome using ont-specific parameters
-            print("Aligning reads to human reference genome for " + file)
-            subprocess.run(
-                "module load apps/singularity; singularity exec apps/minimap2.sif minimap2 -ax map-ont " + ref + " " +
-                file + " > " + out_path + "_aligned.sam", shell=True)
-        if os.path.isfile(out_path + "_unmapped.fastq"):
-            print("Human read removal already complete for " + barcode)
+            print("Aligning reads to human reference genome for {}".format(file))
+            minimap2_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} minimap2 -ax map-ont {} {} -o " \
+                               "{}_aligned.sam".format(app_dictionary["minimap2"], ref, file, out_path)
+            subprocess.run(minimap2_command, shell=True)
+        if os.path.isfile("{}_unmapped.fastq".format(out_path)):
+            print("Human read removal already complete for {}".format(barcode))
         else:
             # import SAM to BAM as @SQ lines present in header, only import unassigned reads (non-human)
-            print("Import non-human reads as BAM file for " + out_path + "_aligned.sam")
-            subprocess.run(
-                "module load apps/singularity; singularity exec apps/samtools.sif samtools view -bS -f 4 " + out_path +
-                "_aligned.sam" + " > " + out_path + "_unmapped.bam", shell=True)
+            print("Import non-human reads as fastq file for {}_aligned.sam".format(out_path))
+
+            samtools_view_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -it {} samtools view -bhS -f 4 " \
+                                    "-o {}_unmapped.bam {}_aligned.sam".format(app_dictionary["samtools"], out_path,
+                                                                              out_path)
+            print(samtools_view_command)
+            subprocess.run(samtools_view_command, shell=True)
             # convert bam to fastq file
-            print("Convert bam to fastq file for Import non-human reads as BAM file for " + out_path + "_unmapped.bam")
-            subprocess.run(
-                "module load apps/singularity; singularity exec apps/samtools.sif samtools bam2fq " + out_path +
-                "_unmapped.bam > " + out_path + "_unmapped.fastq", shell=True)
+            samtools_bam2fq_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -it {} samtools bam2fq " \
+                                      "{}_unmapped.bam > {}_unmapped.fastq".format(app_dictionary["samtools"], out_path,
+                                                                                   out_path)
+            subprocess.run(samtools_bam2fq_command,  shell=True)
+        if os.path.isfile("{}_samtools_stats.txt".format(out_path)):
+            print("Samtools stats already conducted for {}".barcode)
             # remove intermediary file
-            os.remove(out_path + "_unmapped.bam")
+            # os.remove("{}_unmapped.bam".format(out_path))
             # calculate % aligned reads to human reference genome
-            subprocess.run("module load apps/singularity; singularity exec apps/samtools.sif samtools stats " + out_path
-                           + "_aligned.sam | grep ^SN | cut -f 2- > " + out_path + "_samtools_stats.txt", shell=True)
+            samtools_stats_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} samtools stats {}_aligned.sam " \
+                                     "| grep ^SN | cut -f 2- > {}_samtools_stats.txt".format(app_dictionary["samtools"],
+                                                                                             out_path, out_path)
+            subprocess.run(samtools_stats_command, shell=True)
     print("--------------------------")
 
 
@@ -127,22 +136,23 @@ def de_novo_assembly(data_dir, out_dir, run_id):
     # minimum overlap length is chosen automatically based on read length distribution
     # flye performs one polishing iteration by default
     print("--------------------------\nDE NOVO ASSEMBLY\n--------------------------")
-    for data_input in glob.glob(data_dir + "/*.fq"):
+    for data_input in glob.glob("{}/*.fq".format(data_dir)):
         barcode = get_identifier(file=data_input, string="barcode")
-        for file in glob.glob(out_dir + "/human_read_removal/" + run_id + "*" + barcode + "*.fastq"):
-            if os.path.exists(out_dir + "/de_novo_assembly/" + run_id + "_" + barcode):
-                print("De novo assembly already complete for " + barcode)
+        for file in glob.glob("{}/human_read_removal/{}*{}*.fastq".format(out_dir, run_id, barcode)):
+            if os.path.exists("{}/de_novo_assembly/{}_{}".format(out_dir, run_id, barcode)):
+                print("De novo assembly already complete for {}".format(barcode))
             else:
-                print("Performing de novo assembly for " + file)
-                parent_directory = out_dir + "/de_novo_assembly"
-                directory = run_id + "_" + barcode
-                create_directory(parent_directory = parent_directory, directory = directory)
-                create_directory(parent_directory= parent_directory + "/" + directory,
-                                  directory = "pyfaidx_split_contigs")
-                print("Conducting de novo assembly for " + file)
-                subprocess.run("module load apps/singularity; singularity exec apps/flye.sif flye --nano-raw " +
-                                file + " --out-dir " + out_dir + "/de_novo_assembly/" + run_id + "_" + barcode +
-                                " --meta", shell=True)
+                print("Performing de novo assembly for {}".format(file))
+                parent_directory = "{}/de_novo_assembly".format(out_dir)
+                directory = "{}_{}".format(run_id, barcode)
+                create_directory(parent_directory=parent_directory, directory=directory)
+                create_directory(parent_directory="{}/{}".format(parent_directory, directory),
+                                 directory="pyfaidx_split_contigs")
+                print("Conducting de novo assembly for {}".format(file))
+                flye_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} flye --nano-raw {} --out-dir " \
+                               "{}/de_novo_assembly/{}_{} --meta".format(app_dictionary["flye"], file,
+                                                                         out_dir, run_id, barcode)
+                subprocess.run(flye_command, shell=True)
     print("--------------------------")
 
 
@@ -155,26 +165,30 @@ def consensus_generation():
     # bcftools consensus generation
     pass
 
+
 def split_files(data_dir, out_dir, run_id, cwd):
     print("--------------------------\nSPLIT ASSEMBLY INTO CONTIGS\n--------------------------")
-    for data_input in glob.glob(data_dir + "/*.fq"):
+    for data_input in glob.glob("{}/*.fq".format(data_dir)):
         barcode = get_identifier(file=data_input, string="barcode")
-        assembly_directory = out_dir + "/de_novo_assembly/" + run_id + "_" + barcode
-        if not os.listdir(assembly_directory + "/pyfaidx_split_contigs"):
-            print("Splitting assembly for " + barcode + " into a file per contig")
-            os.chdir(assembly_directory + "/pyfaidx_split_contigs")
-            subprocess.run("module load apps/singularity; singularity exec " + cwd + "/apps/pyfaidx.sif faidx " +
-                           "--split-files " + cwd + "/" + assembly_directory + "/assembly.fasta", shell=True)
+        assembly_directory = "{}/de_novo_assembly/{}_{}".format(out_dir, run_id, barcode)
+        if not os.listdir("{}/pyfaidx_split_contigs".format(assembly_directory)):
+            print("Splitting assembly for {} into a file per contig".format(barcode))
+            os.chdir("{}/pyfaidx_split_contigs".format(assembly_directory))
+            faidx_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} faidx --split-files " \
+                            "{}/{}/assembly.fasta".format(app_dictionary["pyfaidx"], cwd, assembly_directory)
+            subprocess.run(faidx_command, shell=True)
             os.chdir(cwd)
-            for file in glob.glob(assembly_directory + "/pyfaidx_split_contigs"):
-                append_id(filename=file, uid=run_id + "_" + barcode)
+            for file in glob.glob("{}/pyfaidx_split_contigs".format(assembly_directory)):
+                append_id(filename=file, uid="{}_{}".format(run_id, barcode))
         else:
-            print("Assembly already split for " + barcode)
+            print("Assembly already split for {}".format(barcode))
     print("--------------------------")
-    
+
+
 def append_id(filename, uid):
     name, ext = os.path.splitext(filename)
     return "{uid}_{name}{ext}".format(name=name, uid=uid, ext=ext)
+
 
 def mlst(data_dir, out_dir, run_id, cwd):
     """
@@ -183,16 +197,17 @@ def mlst(data_dir, out_dir, run_id, cwd):
     split_files(data_dir, out_dir, run_id, cwd)
     # FOR THIS TO WORK I THINK I WILL HAVE TO SPLIT THE ASSEMBLY FILE INTO INDIVIDUAL CONTIGS
     print("--------------------------\nMULTI LOCUS SEQUENCE TYPING\n--------------------------")
-    for data_input in glob.glob(data_dir + "/*.fq"):
+    for data_input in glob.glob("{}/*.fq".format(data_dir)):
         barcode = get_identifier(file=data_input, string="barcode")
-        fasta_input = out_dir + "/de_novo_assembly/" + run_id + "_" + barcode + "/pyfaidx_split_contigs/*.fasta"
-        csv_output = out_dir + "/mlst/" + run_id + "_" + barcode + ".csv"
+        fasta_input = "{}/de_novo_assembly/{}_{}/pyfaidx_split_contigs/*.fasta".format(out_dir, run_id, barcode)
+        csv_output = "{}/mlst/{}_{}.csv".format(out_dir, run_id, barcode)
         if os.path.exists(csv_output):
-            print("MLST already complete for " + barcode)
+            print("MLST already complete for {}".format(barcode))
         else:
-            print("Conducting MLST for " + barcode)
-            subprocess.run("module load apps/singularity; singularity exec apps/mlst.sif mlst --debug " + fasta_input +
-                            " >> " + csv_output, shell=True)
+            print("Conducting MLST for {}".format(barcode))
+            mlst_command = "sudo docker run -v `pwd`:`pwd` -w `{} mlst --debug {} >> {}".format(app_dictionary["mlst"],
+                                                                                                fasta_input, csv_output)
+            subprocess.run(mlst_command, shell=True)
     print("--------------------------")
     pass
 
@@ -202,13 +217,15 @@ def alignment():
     Multi-fasta alignment of all contigs within
     """
 
+
 def variant_calling(out_dir, run_id):
     print("--------------------------\nVARIANT CALLING\n--------------------------")
     print(out_dir)
     print(run_id)
     # SNP-sites to identify SNPs between samples
-    subprocess.run("module load apps/singularity; singularity exec apps/snp-sites.sif snp-sites -m -o " +
-                   OUTPUT_FILENAME + " " + INPUT_FILENAME, shell=True)
+    variant_calling_command = "sudo docker run -v `pwd`:`pwd` -w `{} snp-sites -m -o {} " \
+                              "{}".format(app_dictionary["snp-sites"], OUTPUT_FILENAME, INPUT_FILENAME)
+    subprocess.run(variant_calling_command, shell=True)
     print("--------------------------")
     pass
 
@@ -216,8 +233,9 @@ def variant_calling(out_dir, run_id):
 def genetic_distance(out_dir, run_id):
     print("--------------------------\nGENETIC DISTANCE CALCULATION\n--------------------------")
     # SNP-dists to calculate SNP distances
-    subprocess.run("module load apps/singularity; singularity exec apps/snp-dists.sif snp-dists " + INPUT_FILENAME  +
-                   " > " + OUTPUT_FILENAME.tsv, shell=True)
+    genetic_distance_command = "sudo docker run -v `pwd`:`pwd` -w `{} snp-dists {} > " \
+                               "{}".format(app_dictionary["snp-dists"], INPUT_FILENAME, OUTPUT_FILENAME.tsv)
+    subprocess.run(genetic_distance_command, shell=True)
     print("--------------------------")
     pass
 
@@ -235,26 +253,26 @@ def multiqc(out_dir, run_id):
     Create MultiQC report, pulling in outputs from other tools
     """
     print("--------------------------\nMULTIQC\n--------------------------")
-    if os.path.exists(out_dir + "/multiqc/" + run_id):
-        print("MultiQC report already generated for " + run_id)
+    if os.path.exists("{}/multiqc/{}".format(out_dir, run_id)):
+        print("MultiQC report already generated for {}".format(run_id))
     else:
         print("Creating MultiQC report for the analysis")
-        subprocess.run(
-            "module load apps/singularity; singularity exec apps/multiqc.sif python -m multiqc " + out_dir + " --outdir " +
-            out_dir + "/multiqc/" + run_id, shell=True)
+        multiqc_command = "sudo docker run -v `pwd`:`pwd` -w `{} multiqc {} --outdir " \
+                          "{}/multiqc/{}".format(app_dictionary["multiqc"], out_dir, out_dir, run_id)
+        subprocess.run(multiqc_command, shell=True)
     print("--------------------------")
 
 
 def main():
     # Install containers
     install_containers.install_tools()
-    # Load singularity
+
     for run in os.listdir("data/run_folders"):
-        if os.path.isdir("data/run_folders/" + run):
-            data_dir = "data/run_folders/" + run
-            for summary_file in glob.glob(data_dir + "/final_summary_*.txt"):
+        if os.path.isdir("data/run_folders/{}".format(run)):
+            data_dir = "data/run_folders/{}".format(run)
+            for summary_file in glob.glob("{}/final_summary_*.txt".format(data_dir)):
                 run_id = get_identifier(file=summary_file, string="sample_id=").rstrip("\n")
-                out_dir = "output/" + run
+                out_dir = "output/{}".format(run)
                 # create output directory per run, and subdirectories for outputs from each tool
                 create_directory(parent_directory="output", directory=run_id)
                 sub_directories = ["fastqc", "pycoqc", "human_read_removal", "de_novo_assembly", "mlst", "snp-sites",
@@ -269,10 +287,10 @@ def main():
                 human_read_removal(data_dir=data_dir, out_dir=out_dir, run_id=run_id, ref=reference_genome)
                 de_novo_assembly(data_dir=data_dir, out_dir=out_dir, run_id=run_id)
                 cwd = os.getcwd()
-                mlst(data_dir=data_dir, out_dir=out_dir, run_id=run_id, cwd=cwd)
-                #variant_calling(out_dir=out_dir, run_id=run_id)
-                #genetic_distance(out_dir=out_dir, run_id=run_id)
-                multiqc(out_dir=out_dir, run_id=run_id)
+                # mlst(data_dir=data_dir, out_dir=out_dir, run_id=run_id, cwd=cwd)
+                # variant_calling(out_dir=out_dir, run_id=run_id)
+                # genetic_distance(out_dir=out_dir, run_id=run_id)
+                # multiqc(out_dir=out_dir, run_id=run_id)
 
 
 if __name__ == '__main__':
