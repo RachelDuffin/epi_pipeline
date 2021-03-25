@@ -104,19 +104,12 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
         if os.path.isfile("{}_unmapped.fastq".format(out_path)):
             print("Human read removal already complete for {}".format(barcode))
         else:
-            # import SAM to BAM as @SQ lines present in header, only import unassigned reads (non-human)
+            # import unassigned reads from sam file and convert to fastq file
             print("Import non-human reads as fastq file for {}_aligned.sam".format(out_path))
-
-            samtools_view_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -it {} samtools view -bhS -f 4 " \
-                                    "-o {}_unmapped.bam {}_aligned.sam".format(app_dictionary["samtools"], out_path,
-                                                                              out_path)
-            print(samtools_view_command)
-            subprocess.run(samtools_view_command, shell=True)
-            # convert bam to fastq file
-            samtools_bam2fq_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -it {} samtools bam2fq " \
-                                      "{}_unmapped.bam > {}_unmapped.fastq".format(app_dictionary["samtools"], out_path,
-                                                                                   out_path)
-            subprocess.run(samtools_bam2fq_command,  shell=True)
+            samtools_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -it {} samtools fastq -f 4 " \
+                                    "{}_aligned.sam > {}_unmapped.fastq".format(app_dictionary["samtools"],
+                                                                                out_path, out_path)
+            subprocess.run(samtools_command, shell=True)
         if os.path.isfile("{}_samtools_stats.txt".format(out_path)):
             print("Samtools stats already conducted for {}".barcode)
             # remove intermediary file
