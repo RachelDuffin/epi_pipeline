@@ -48,7 +48,7 @@ def fastqc(data_dir, out_dir, run_id):
             print("FastQC output for run {} already exists".format(run_id))
         else:
             print("Creating FastQC file for run {}".format(run_id))
-            fastqc_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} fastqc {} -o " \
+            fastqc_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} fastqc {} -o " \
                              "{}/fastqc".format(app_dictionary["fastqc"], file, out_dir)
             subprocess.run(fastqc_command, shell=True)
     print("--------------------------")
@@ -68,7 +68,7 @@ def pycoqc(data_dir, out_dir):
             # get barcode name from barcode_split output file names
             barcode = file.split(".", 1)[0].split("summary_", 1)[1]
             print("Creating PycoQC json report for {}".format(file))
-            pycoqc_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} pycoQC -f {} --json_outfile " \
+            pycoqc_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} pycoQC -f {} --json_outfile " \
                              "{}/pycoqc/{}_pycoQC_output.json".format(app_dictionary["pycoqc"], file, out_dir, barcode)
             subprocess.run(pycoqc_command, shell=True)
     else:
@@ -79,7 +79,7 @@ def pycoqc(data_dir, out_dir):
 def split_barcodes(data_dir, out_dir):
     for file in glob.glob("{}/sequencing_summary_*".format(data_dir)):
         print("Splitting summary sequencing file {} according to barcodes".format(file))
-        split_barcode_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} Barcode_split " \
+        split_barcode_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} Barcode_split " \
                                 "--output_unclassified --min_barcode_percent 0.0 --summary_file {} --output_dir " \
                                 "{}/pycoqc".format(app_dictionary["pycoqc"], file, out_dir)
         subprocess.run(split_barcode_command, shell=True)
@@ -98,7 +98,7 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
         else:
             # align reads to human reference genome using ont-specific parameters
             print("Aligning reads to human reference genome for {}".format(file))
-            minimap2_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} minimap2 -ax map-ont {} {} -o " \
+            minimap2_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} minimap2 -ax map-ont {} {} -o " \
                                "{}_aligned.sam".format(app_dictionary["minimap2"], ref, file, out_path)
             subprocess.run(minimap2_command, shell=True)
         if os.path.isfile("{}_unmapped.fastq".format(out_path)):
@@ -106,16 +106,16 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
         else:
             # import unassigned reads from sam file and convert to fastq file
             print("Import non-human reads as fastq file for {}_aligned.sam".format(out_path))
-            samtools_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -it {} samtools fastq -f 4 " \
-                                    "{}_aligned.sam > {}_unmapped.fastq".format(app_dictionary["samtools"],
-                                                                                out_path, out_path)
-            subprocess.run(samtools_command, shell=True)
+            samtools_fastq_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} samtools fastq -f 4 " \
+                                     "{}_aligned.sam -0 {}_unmapped.fastq".format(app_dictionary["samtools"], out_path,
+                                                                                  out_path)
+            subprocess.run(samtools_fastq_command, shell=True)
         if os.path.isfile("{}_samtools_stats.txt".format(out_path)):
             print("Samtools stats already conducted for {}".barcode)
             # remove intermediary file
             # os.remove("{}_unmapped.bam".format(out_path))
             # calculate % aligned reads to human reference genome
-            samtools_stats_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} samtools stats {}_aligned.sam " \
+            samtools_stats_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} samtools stats {}_aligned.sam " \
                                      "| grep ^SN | cut -f 2- > {}_samtools_stats.txt".format(app_dictionary["samtools"],
                                                                                              out_path, out_path)
             subprocess.run(samtools_stats_command, shell=True)
@@ -142,7 +142,7 @@ def de_novo_assembly(data_dir, out_dir, run_id):
                 create_directory(parent_directory="{}/{}".format(parent_directory, directory),
                                  directory="pyfaidx_split_contigs")
                 print("Conducting de novo assembly for {}".format(file))
-                flye_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} flye --nano-raw {} --out-dir " \
+                flye_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye --nano-raw {} --out-dir " \
                                "{}/de_novo_assembly/{}_{} --meta".format(app_dictionary["flye"], file,
                                                                          out_dir, run_id, barcode)
                 subprocess.run(flye_command, shell=True)
@@ -167,7 +167,7 @@ def split_files(data_dir, out_dir, run_id, cwd):
         if not os.listdir("{}/pyfaidx_split_contigs".format(assembly_directory)):
             print("Splitting assembly for {} into a file per contig".format(barcode))
             os.chdir("{}/pyfaidx_split_contigs".format(assembly_directory))
-            faidx_command = "sudo docker run -v `pwd`:`pwd` -w `pwd` -i -t {} faidx --split-files " \
+            faidx_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} faidx --split-files " \
                             "{}/{}/assembly.fasta".format(app_dictionary["pyfaidx"], cwd, assembly_directory)
             subprocess.run(faidx_command, shell=True)
             os.chdir(cwd)
@@ -198,7 +198,7 @@ def mlst(data_dir, out_dir, run_id, cwd):
             print("MLST already complete for {}".format(barcode))
         else:
             print("Conducting MLST for {}".format(barcode))
-            mlst_command = "sudo docker run -v `pwd`:`pwd` -w `{} mlst --debug {} >> {}".format(app_dictionary["mlst"],
+            mlst_command = "sudo docker run --rm -v `pwd`:`pwd` -w `{} mlst --debug {} >> {}".format(app_dictionary["mlst"],
                                                                                                 fasta_input, csv_output)
             subprocess.run(mlst_command, shell=True)
     print("--------------------------")
@@ -216,7 +216,7 @@ def variant_calling(out_dir, run_id):
     print(out_dir)
     print(run_id)
     # SNP-sites to identify SNPs between samples
-    variant_calling_command = "sudo docker run -v `pwd`:`pwd` -w `{} snp-sites -m -o {} " \
+    variant_calling_command = "sudo docker run --rm -v `pwd`:`pwd` -w `{} snp-sites -m -o {} " \
                               "{}".format(app_dictionary["snp-sites"], OUTPUT_FILENAME, INPUT_FILENAME)
     subprocess.run(variant_calling_command, shell=True)
     print("--------------------------")
@@ -226,7 +226,7 @@ def variant_calling(out_dir, run_id):
 def genetic_distance(out_dir, run_id):
     print("--------------------------\nGENETIC DISTANCE CALCULATION\n--------------------------")
     # SNP-dists to calculate SNP distances
-    genetic_distance_command = "sudo docker run -v `pwd`:`pwd` -w `{} snp-dists {} > " \
+    genetic_distance_command = "sudo docker run --rm -v `pwd`:`pwd` -w `{} snp-dists {} > " \
                                "{}".format(app_dictionary["snp-dists"], INPUT_FILENAME, OUTPUT_FILENAME.tsv)
     subprocess.run(genetic_distance_command, shell=True)
     print("--------------------------")
@@ -250,7 +250,7 @@ def multiqc(out_dir, run_id):
         print("MultiQC report already generated for {}".format(run_id))
     else:
         print("Creating MultiQC report for the analysis")
-        multiqc_command = "sudo docker run -v `pwd`:`pwd` -w `{} multiqc {} --outdir " \
+        multiqc_command = "sudo docker run --rm -v `pwd`:`pwd` -w `{} multiqc {} --outdir " \
                           "{}/multiqc/{}".format(app_dictionary["multiqc"], out_dir, out_dir, run_id)
         subprocess.run(multiqc_command, shell=True)
     print("--------------------------")
