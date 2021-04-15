@@ -8,7 +8,6 @@ import install_containers
 from install_containers import app_dictionary
 
 
-# SETTINGS
 def get_identifier(file, string):
     """
     Gets the run id from the run's final_summary file
@@ -115,9 +114,9 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
             # remove intermediary file
             # os.remove("{}_unmapped.bam".format(out_path))
             # calculate % aligned reads to human reference genome
-            samtools_stats_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} samtools stats {}_aligned.sam " \
-                                     "| grep ^SN | cut -f 2- > {}_samtools_stats.txt".format(app_dictionary["samtools"],
-                                                                                             out_path, out_path)
+            samtools_stats_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} " \
+                                     "samtools stats {}_aligned.sam | grep ^SN | cut -f 2- > " \
+                                     "{}_samtools_stats.txt".format(app_dictionary["samtools"], out_path, out_path)
             subprocess.run(samtools_stats_command, shell=True)
     print("--------------------------")
 
@@ -140,7 +139,7 @@ def de_novo_assembly(data_dir, out_dir, run_id):
                 directory = "{}_{}".format(run_id, barcode)
                 create_directory(parent_directory=parent_directory, directory=directory)
                 create_directory(parent_directory="{}/{}".format(parent_directory, directory),
-                                 directory="pyfaidx_split_contigs")
+                                 directory="pyfasta_split_contigs")
                 print("Conducting de novo assembly for {}".format(file))
                 flye_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye --nano-raw {} --out-dir " \
                                "{}/de_novo_assembly/{}_{} --meta".format(app_dictionary["flye"], file,
@@ -164,14 +163,15 @@ def split_files(data_dir, out_dir, run_id, cwd):
     for data_input in glob.glob("{}/*.fq".format(data_dir)):
         barcode = get_identifier(file=data_input, string="barcode")
         assembly_directory = "{}/de_novo_assembly/{}_{}".format(out_dir, run_id, barcode)
-        if not os.listdir("{}/pyfaidx_split_contigs".format(assembly_directory)):
+        if not os.listdir("{}/pyfasta_split_contigs".format(assembly_directory)):
             print("Splitting assembly for {} into a file per contig".format(barcode))
-            os.chdir("{}/pyfaidx_split_contigs".format(assembly_directory))
-            faidx_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} faidx --split-files " \
-                            "{}/{}/assembly.fasta".format(app_dictionary["pyfaidx"], cwd, assembly_directory)
+            os.chdir("{}/pyfasta_split_contigs".format(assembly_directory))
+            faidx_command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} ; pwd ; pyfasta split --header " \
+                            "'%(seqid)s.fasta' {}/{}/assembly.fasta".format(app_dictionary["pyfasta"], cwd,
+                                                                            assembly_directory)
             subprocess.run(faidx_command, shell=True)
             os.chdir(cwd)
-            for file in glob.glob("{}/pyfaidx_split_contigs".format(assembly_directory)):
+            for file in glob.glob("{}/pyfasta_split_contigs".format(assembly_directory)):
                 append_id(filename=file, uid="{}_{}".format(run_id, barcode))
         else:
             print("Assembly already split for {}".format(barcode))
@@ -187,19 +187,18 @@ def mlst(data_dir, out_dir, run_id, cwd):
     """
     Multi-locus sequence typing using MLST
     """
-    split_files(data_dir, out_dir, run_id, cwd)
     # FOR THIS TO WORK I THINK I WILL HAVE TO SPLIT THE ASSEMBLY FILE INTO INDIVIDUAL CONTIGS
     print("--------------------------\nMULTI LOCUS SEQUENCE TYPING\n--------------------------")
     for data_input in glob.glob("{}/*.fq".format(data_dir)):
         barcode = get_identifier(file=data_input, string="barcode")
-        fasta_input = "{}/de_novo_assembly/{}_{}/pyfaidx_split_contigs/*.fasta".format(out_dir, run_id, barcode)
+        fasta_input = "{}/de_novo_assembly/{}_{}/pyfasta_split_contigs/*.fasta".format(out_dir, run_id, barcode)
         csv_output = "{}/mlst/{}_{}.csv".format(out_dir, run_id, barcode)
         if os.path.exists(csv_output):
             print("MLST already complete for {}".format(barcode))
         else:
             print("Conducting MLST for {}".format(barcode))
-            mlst_command = "sudo docker run --rm -v `pwd`:`pwd` -w `{} mlst --debug {} >> {}".format(app_dictionary["mlst"],
-                                                                                                fasta_input, csv_output)
+            mlst_command = "sudo docker run --rm -v `pwd`:`pwd` -w `{} mlst --debug {} >> " \
+                           "{}".format(app_dictionary["mlst"], fasta_input, csv_output)
             subprocess.run(mlst_command, shell=True)
     print("--------------------------")
     pass
@@ -258,11 +257,12 @@ def multiqc(out_dir, run_id):
 
 def main():
     # Install containers
-    install_containers.install_tools()
-
+    for key in app_dictionary:
+        install_containers.install_tools(key)
     for run in os.listdir("data/run_folders"):
         if os.path.isdir("data/run_folders/{}".format(run)):
             data_dir = "data/run_folders/{}".format(run)
+            print("--------------------------\nANALYSING RUN {}\n--------------------------".format(run))
             for summary_file in glob.glob("{}/final_summary_*.txt".format(data_dir)):
                 run_id = get_identifier(file=summary_file, string="sample_id=").rstrip("\n")
                 out_dir = "output/{}".format(run)
@@ -279,7 +279,7 @@ def main():
                 reference_genome = "data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna"
                 human_read_removal(data_dir=data_dir, out_dir=out_dir, run_id=run_id, ref=reference_genome)
                 de_novo_assembly(data_dir=data_dir, out_dir=out_dir, run_id=run_id)
-                cwd = os.getcwd()
+                split_files(data_dir=data_dir, out_dir=out_dir, run_id=run_id, cwd=os.getcwd())
                 # mlst(data_dir=data_dir, out_dir=out_dir, run_id=run_id, cwd=cwd)
                 # variant_calling(out_dir=out_dir, run_id=run_id)
                 # genetic_distance(out_dir=out_dir, run_id=run_id)

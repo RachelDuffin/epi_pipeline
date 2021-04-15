@@ -1,6 +1,5 @@
 import os
 import subprocess
-# pull singularity images (e.g. medaka)
 
 app_dictionary = {
     "fastqc": "quay.io/biocontainers/fastqc@sha256:319b8d4eca0fc0367d192941f221f7fcd29a6b96996c63cbf8931dbb66e53348",
@@ -19,27 +18,28 @@ app_dictionary = {
         "quay.io/biocontainers/snp-sites@sha256:02c868581e36f97cc16f066f0ef4c2d169873ca4cf6932a104beb10c828a9c5c",
     "snp-dists":
         "quay.io/biocontainers/snp-dists@sha256:7ac5037a7967252593acee51b2ce2202b30a387d53bd62005fc3e927145557b4",
-    "pyfaidx": "quay.io/biocontainers/pyfaidx@sha256:e7a2a24d3b5ea10181be085e0b39056c8c90a3298ab13f3f33104d2e3f46f314"
+    "pyfaidx": "quay.io/biocontainers/pyfaidx@sha256:e7a2a24d3b5ea10181be085e0b39056c8c90a3298ab13f3f33104d2e3f46f314",
+    "pyfasta":
+        "quay.io/biocontainers/pyfasta@sha256:ef411a1024f06e3a065fa160f64827167ce5ed44ad0de5c338f7e249ada55441"
 }
 
 
-def install_tools():
+def install_tools(key, value):
     """
-    Checks if each docker image specified in app_dictionary already exists, if not pulls from biocontainers
+    Checks if docker image specified in app_dictionary already exists, if not pulls from biocontainers
     """
-    print("--------------------------\nInstalling pipeline tools\n--------------------------")
-
-    for key in app_dictionary:
-        if subprocess.check_output("sudo docker images -q " + app_dictionary[key], shell=True):
-            print(key + " docker image already pulled")
-        else:
-            print("Installing " + key)
-            os.system("sudo docker image pull " + app_dictionary[key])
+    print("--------------------------\nInstalling docker images\n--------------------------")
+    if subprocess.check_output("sudo docker images -q " + value, shell=True):
+        print(key + " docker image already pulled")
+    else:
+        print("Installing " + key)
+        os.system("sudo docker image pull " + value)
     print("----------------------------")
 
 
 def main():
-    install_tools()
+    for key in app_dictionary:
+        install_tools(key)
 
 
 if __name__ == '__main__':
