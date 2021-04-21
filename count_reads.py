@@ -63,7 +63,7 @@ file_dictionary = {"monoisolates": {"file_path": "/mnt/flavia/rduffin/outbreak_p
 
 def count_reads(sample_type, fastq_list, file_path):
     """
-    Calculate number of reads in each sample and output to file
+    Calculate number of reads in each fastq file and output to file
     """
     # overwrite old read count file
     read_count = open("read_count_{}.txt".format(sample_type), 'w')
@@ -71,17 +71,34 @@ def count_reads(sample_type, fastq_list, file_path):
     # get read count from all files in dictionary and print to output file
     with open("read_count_{}.txt".format(sample_type), 'a') as filetowrite:
         for file in fastq_list:
-            stdout, stderr = subprocess.Popen("grep '>' {}{} | wc -l ".format(file_path, file), shell=True,
+            stdout, stderr = subprocess.Popen("awk 'END {print NR/4}' " + file_path + file, shell=True,
                                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
-            print(stdout.decode('ascii'))
-            filetowrite.write("{}    {}".format(file, stdout.decode('ascii')))
+            filetowrite.write(stdout.decode('ascii'))
     filetowrite.close()
+
+
+def calculate_read_length(sample_type, fastq_list, file_path):
+    """
+    Calculate length of reads in each fastq file and output to file
+    """
+    # overwrite old read length file
+    read_count = open("read_length_{}.txt".format(sample_type), 'w')
+    read_count.close()
+    # get max and min read length from all files in dictionary and print to output file
+    with open("read_length_{}.txt".format(sample_type), 'a') as filetowrite:
+        for file in fastq_list:
+            stdout, stderr = subprocess.Popen("awk 'NR%4==2{print length($0)}' " + file_path + file, shell=True,
+                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
+            filetowrite.write(stdout.decode('ascii'))
+        filetowrite.close()
 
 
 def main():
     for key in file_dictionary:
         count_reads(sample_type=key, fastq_list=file_dictionary[key]["files"],
                     file_path=file_dictionary[key]["file_path"])
+        calculate_read_length(sample_type=key, fastq_list=file_dictionary[key]["files"],
+                              file_path=file_dictionary[key]["file_path"])
 
 
 if __name__ == '__main__':
