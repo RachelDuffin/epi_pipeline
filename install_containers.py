@@ -20,7 +20,11 @@ app_dictionary = {
         "quay.io/biocontainers/snp-dists@sha256:7ac5037a7967252593acee51b2ce2202b30a387d53bd62005fc3e927145557b4",
     "pyfaidx": "quay.io/biocontainers/pyfaidx@sha256:e7a2a24d3b5ea10181be085e0b39056c8c90a3298ab13f3f33104d2e3f46f314",
     "pyfasta":
-        "quay.io/biocontainers/pyfasta@sha256:ef411a1024f06e3a065fa160f64827167ce5ed44ad0de5c338f7e249ada55441"
+        "quay.io/biocontainers/pyfasta@sha256:ef411a1024f06e3a065fa160f64827167ce5ed44ad0de5c338f7e249ada55441",
+    "centrifuge":
+        "quay.io/biocontainers/centrifuge@sha256:e3ce6d3d83a1df5327ee27b66d4c9eedb05b7bcd2eae8f78a7f7b9c1e8672c1c",
+    "entrez-direct":
+        "quay.io/biocontainers/entrez-direct@sha256:c8d5868f25ae6d0ff2389cec69c618f6f49d8b836e1786f9e49cff0bc21dbede"
 }
 
 
@@ -39,7 +43,8 @@ def install_tools(key, value):
 
 def main():
     for key in app_dictionary:
-        install_tools(key)
+        value = app_dictionary[key]
+        install_tools(key, value)
 
 
 if __name__ == '__main__':
