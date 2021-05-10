@@ -38,11 +38,10 @@ def flye_assembly(filepath, filename, out_dir, threads):
     Run test datasets through flye with differing numbers of threads to assess scalability, performance and accuracy.
     """
     # scalability/performance
-
-    print("--------------------------\nDE NOVO ASSEMBLY for {}\n--------------------------".format(filepath))
+    print("--------------------------\nFLYE DE NOVO ASSEMBLY for {}\n--------------------------".format(filepath))
 
     # overwrite old file
-    time_file = "test_data/output/assemblers/mock_microbial_community/{}_flye_{}_thread.txt".format(filename, threads)
+    time_file = out_dir + "{}_flye_{}_thread.txt".format(filename, threads)
     time_output = open(time_file, 'w')
     time_output.close()
     with open(time_file, 'a') as filetowrite:
@@ -51,6 +50,7 @@ def flye_assembly(filepath, filename, out_dir, threads):
                                           "{}".format(app_dictionary["flye"], filepath, out_dir, threads),
                                           shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
         filetowrite.write(stdout.decode('ascii'))
+        os.rename("{}assembly.fasta".format(out_dir), "{}{}_flye_{}_thread.fasta".format(out_dir, filename, threads))
     print("--------------------------")
     # accuracy comparison using MUMmer package
 
@@ -60,15 +60,29 @@ def canu_assembly(filepath, filename, out_dir, threads):
     Run test datasets through canu with differing numbers of threads to assess scalability, performance and accuracy.
     """
     # scalability/performance
+    print("--------------------------\nCANU DE NOVO ASSEMBLY for {}\n--------------------------".format(filepath))
+
+    # overwrite old file
+    time_file = \
+        "test_data/output/assemblers/mock_microbial_community/canu/{}_canu_{}_thread.txt".format(filename, threads)
+    time_output = open(time_file, 'w')
+    time_output.close()
 
     # accuracy comparison using MUMmer package
 
 
-def raven_assembly():
+def raven_assembly(filepath, filename, out_dir, threads):
     """
     Run test datasets through raven with differing numbers of threads to assess scalability, performance and accuracy.
     """
     # scalability/performance
+    print("--------------------------\nRAVEN DE NOVO ASSEMBLY for {}\n--------------------------".format(filepath))
+
+    # overwrite old file
+    time_file = \
+        "test_data/output/assemblers/mock_microbial_community/raven/{}_raven_{}_thread.txt".format(filename, threads)
+    time_output = open(time_file, 'w')
+    time_output.close()
 
     # accuracy comparison using MUMmer package
 
@@ -86,21 +100,21 @@ def main():
     # Conduct flye analyses
     for fq in input_filepaths:
         sample_name = str(fq).rsplit("/", 1)[1]
-        flye_directory = output_directory + "flye"
+        flye_directory = output_directory + "flye/"
         for thread in [1, 2, 4, 8]:
             flye_assembly(filepath=fq, filename=sample_name, out_dir=flye_directory, threads=thread)
     # Conduct canu analyses
-    for fq in input_filepaths:
-        sample_name = str(fq).rsplit("/", 1)[1]
-        canu_directory = output_directory + "canu"
-        for thread in [1, 2, 4, 8]:
-            canu_assembly(filepath=fq, filename=sample_name, out_dir=canu_directory, threads=thread)
+    #for fq in input_filepaths:
+    #    sample_name = str(fq).rsplit("/", 1)[1]
+    #    canu_directory = output_directory + "canu"
+    #    for thread in [1, 2, 4, 8]:
+    #        canu_assembly(filepath=fq, filename=sample_name, out_dir=canu_directory, threads=thread)
     # Conduct raven analyses
-    for fq in input_filepaths:
-        sample_name = str(fq).rsplit("/", 1)[1]
-        raven_directory = output_directory + "raven"
-        for thread in [1, 2, 4, 8]:
-            raven_assembly(filepath=fq, filename=sample_name, out_dir=raven_directory, threads=thread)
+    #for fq in input_filepaths:
+    #    sample_name = str(fq).rsplit("/", 1)[1]
+    #    raven_directory = output_directory + "raven"
+    #    for thread in [1, 2, 4, 8]:
+    #        raven_assembly(filepath=fq, filename=sample_name, out_dir=raven_directory, threads=thread)
 
     # Comparison with simulated monomicrobial reads (Nano-Sim H)
     # Comparison with simulated metagenomic reads (NanoSim meta)
