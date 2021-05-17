@@ -24,7 +24,8 @@ app_dictionary = {
     "centrifuge":
         "quay.io/biocontainers/centrifuge@sha256:e3ce6d3d83a1df5327ee27b66d4c9eedb05b7bcd2eae8f78a7f7b9c1e8672c1c",
     "entrez-direct":
-        "quay.io/biocontainers/entrez-direct@sha256:c8d5868f25ae6d0ff2389cec69c618f6f49d8b836e1786f9e49cff0bc21dbede"
+        "quay.io/biocontainers/entrez-direct@sha256:c8d5868f25ae6d0ff2389cec69c618f6f49d8b836e1786f9e49cff0bc21dbede",
+    "mummer4": "quay.io/biocontainers/mummer4@sha256:71a50b71457f7092177508522cd48da25ab0ece07544b946756b47f0dbfbff39"
 }
 
 
