@@ -12,6 +12,22 @@ app_dictionary = {
     "medaka": "quay.io/biocontainers/medaka@sha256:6aa52d718af0f48cf6630e88b22cd7187770bbf028ef89bc54ec7fad2ff7a35f"
 }
 
+base_path = "/mnt/flavia/rduffin/outbreak_pipeline/test_data/"
+filepaths = {
+    "input/mock_microbial_community/Zymo-GridION-EVEN-BB-SN.fq.gz": "output/assemblers/mock_microbial_community/",
+    "input/mock_microbial_community/Zymo-GridION-LOG-BB-SN.fq.gz": "output/assemblers/mock_microbial_community/",
+    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode01.fq":
+        "output/assemblers/monomicrobial_samples",
+    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode02.fq":
+        "output/assemblers/monomicrobial_samples",
+    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode03.fq":
+        "output/assemblers/monomicrobial_samples",
+    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode04.fq":
+        "output/assemblers/monomicrobial_samples",
+    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode05.fq":
+        "output/assemblers/monomicrobial_samples"
+}
+
 # Script to compare performance, scalability and accuracy between assembly tools
 
 # PERFORMANCE AND SCALABILITY:
@@ -31,6 +47,11 @@ app_dictionary = {
 # - Coverage - ratio of no. aligned bases in ref to length of ref (should be near to 100%)
 # - No. mismatches - no. single-base differences between assembly and ref (should be 0)
 # - No. indels - number of insertions and deletions between assembly and ref
+
+def mummer():
+    """
+    Accuracy comparison using MUMmer package using monomicrobial Nano-Sim H generated reads.
+    """
 
 
 def flye_assembly(filepath, filename, out_dir, threads):
@@ -52,7 +73,6 @@ def flye_assembly(filepath, filename, out_dir, threads):
         filetowrite.write(stdout.decode('ascii'))
         os.rename("{}assembly.fasta".format(out_dir), "{}{}_flye_{}_thread.fasta".format(out_dir, filename, threads))
     print("--------------------------")
-    # accuracy comparison using MUMmer package
 
 
 def canu_assembly(filepath, filename, out_dir, threads):
@@ -67,8 +87,21 @@ def canu_assembly(filepath, filename, out_dir, threads):
         "test_data/output/assemblers/mock_microbial_community/canu/{}_canu_{}_thread.txt".format(filename, threads)
     time_output = open(time_file, 'w')
     time_output.close()
-
-    # accuracy comparison using MUMmer package
+    assembly_prefix = ""
+    assembly_directory = ""
+    with open(time_file, 'a') as filetowrite:
+        stdout, stderr = subprocess.Popen("/usr/bin/time -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} canu"
+                                          " -p {} -d {} minThreads={} maxThreads={} corThreads={} "
+                                          "maxInputCoverage=10000 corOutCoverage=10000 "
+                                          "corMhapSensitivity=high corMinCoverage=0 redMemory=32 oeaMemory=32 "
+                                          "batMemory=126 -nanopore {} -t {}".format(app_dictionary["flye"],
+                                                                                    assembly_prefix, assembly_directory,
+                                                                                    threads, threads, threads,
+                                                                                    threads, filepath),
+                                          shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
+        filetowrite.write(stdout.decode('ascii'))
+        os.rename("{}assembly.fasta".format(out_dir), "{}{}_canu_{}_thread.fasta".format(out_dir, filename, threads))
+    print("--------------------------")
 
 
 def raven_assembly(filepath, filename, out_dir, threads):
@@ -83,42 +116,29 @@ def raven_assembly(filepath, filename, out_dir, threads):
         "test_data/output/assemblers/mock_microbial_community/raven/{}_raven_{}_thread.txt".format(filename, threads)
     time_output = open(time_file, 'w')
     time_output.close()
-
-    # accuracy comparison using MUMmer package
+    with open(time_file, 'a') as filetowrite:
+        stdout, stderr = subprocess.Popen("/usr/bin/time -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} raven"
+                                          " {} -t {}".format(app_dictionary["flye"], filepath, threads),
+                                          shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
+        filetowrite.write(stdout.decode('ascii'))
+        os.rename("{}assembly.fasta".format(out_dir), "{}{}_raven_{}_thread.fasta".format(out_dir, filename, threads))
+    print("--------------------------")
 
 
 def main():
     for key in app_dictionary:
         install_containers.install_tools(key, app_dictionary[key])
 
-    # Comparison with log and even mock community standards
-    input_filepaths = ["/mnt/flavia/rduffin/outbreak_pipeline/test_data/input/mock_microbial_community/"
-                       "Zymo-GridION-EVEN-BB-SN.fq.gz",
-                       "/mnt/flavia/rduffin/outbreak_pipeline/test_data/input/mock_microbial_community/"
-                       "Zymo-GridION-LOG-BB-SN.fq.gz"]
-    output_directory = "/mnt/flavia/rduffin/outbreak_pipeline/test_data/output/assemblers/mock_microbial_community/"
-    # Conduct flye analyses
+    # conduct comparison of metagenomic assemblers, using 5 E. faecium isolates (monomicrobial samples), and Zymo
+    # mock community data
     for fq in input_filepaths:
-        sample_name = str(fq).rsplit("/", 1)[1]
-        flye_directory = output_directory + "flye/"
+        sample_name = str(base_path + fq).rsplit("/", 1)[1]
+        filepath = base_path + fq
+        out_dir = base_path + input_filepaths[fq]
         for thread in [1, 2, 4, 8]:
-            flye_assembly(filepath=fq, filename=sample_name, out_dir=flye_directory, threads=thread)
-    # Conduct canu analyses
-    #for fq in input_filepaths:
-    #    sample_name = str(fq).rsplit("/", 1)[1]
-    #    canu_directory = output_directory + "canu"
-    #    for thread in [1, 2, 4, 8]:
-    #        canu_assembly(filepath=fq, filename=sample_name, out_dir=canu_directory, threads=thread)
-    # Conduct raven analyses
-    #for fq in input_filepaths:
-    #    sample_name = str(fq).rsplit("/", 1)[1]
-    #    raven_directory = output_directory + "raven"
-    #    for thread in [1, 2, 4, 8]:
-    #        raven_assembly(filepath=fq, filename=sample_name, out_dir=raven_directory, threads=thread)
-
-    # Comparison with simulated monomicrobial reads (Nano-Sim H)
-    # Comparison with simulated metagenomic reads (NanoSim meta)
-    # Comparison with 21 E. faecium isolates (monomicrobial samples)
+            flye_assembly(filepath=filepath, filename=sample_name, out_dir= out_dir, threads=thread)
+            canu_assembly(filepath=fq, filename=sample_name, out_dir=canu_directory, threads=thread)
+            raven_assembly(filepath=fq, filename=sample_name, out_dir=raven_directory, threads=thread)
 
 
 if __name__ == '__main__':
