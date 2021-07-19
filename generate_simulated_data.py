@@ -6,10 +6,7 @@ import shutil
 import glob
 
 app_dictionary = {
-    "nanosim": "quay.io/biocontainers/nanosim@sha256:d99389f4fafd8a36547cf5c2a6996a97d929482090682b1a4d070c28069d199b",
-    "nanosim_h": "quay.io/biocontainers/nanosim-h@sha256:"
-                 "76e3d6ab85a917623886d04b49504f1c0865dcfb6fa27cf9d8bd1a7145a26150"
-}
+    "nanosim": "quay.io/biocontainers/nanosim@sha256:d99389f4fafd8a36547cf5c2a6996a97d929482090682b1a4d070c28069d199b"}
 
 reference_list = {"A_baumannii": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Acinetobacter_baumannii/"
                                 "representative/GCF_002116925.1_ASM211692v1/GCF_002116925.1_ASM211692v1_genomic.fna.gz",
@@ -44,7 +41,39 @@ def download_refs(out_dir):
                 print("\nDownloading reference sequence from NCBI for " + key)
                 wget.download(reference_list[key], out=out_dir)
 
-#def nanosim():
+def nanosim_genome(refs_dir):
+    """
+    Generate simulated genomic reads per reference genome.
+    """
+    print("--------------------------\nGENERATE SIMULATED GENOMIC READS {}\n--------------------------")
+    cwd = pwd()
+    out_dir = "/media/data2/share/outbreak_pipeline/rduffin/outbreak_pipeline/test_data/input/" \
+              "simulated_monomicrobial_reads"
+    os.chdir(out_dir)
+    for reference in glob.glob(refs_dir + "*.fna"):
+        command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} nanosim simulator.py genome -rg {} -n {} " \
+                  "-max {} -min {} -b guppy".format(app_dctionary[nanosim], reference_genome, read_number, max_len,
+                                                    min_len)
+        subprocess.run(command, shell=True)
+    # use the calculated max/min read lengths from my other script here?? although were they calculated from
+    # enterococcus?
+    os.chdir(cwd)
+    print("--------------------------")
+
+def nanosim_metagenome(refs_dir):
+    """
+    Generate simulated metagenomic reads per reference genome.
+    """
+    cwd = pwd()
+    out_dir = "/media/data2/share/outbreak_pipeline/rduffin/outbreak_pipeline/test_data/input/" \
+              "simulated_metagenomic_reads"
+    os.chdir(out_dir)
+    command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} nanosim simulator.py metagenome -gl {} -n {} " \
+                  "-max {} -min {} -b guppy".format(app_dctionary[nanosim], genome_list, read_number, max_len, min_len)
+    # create genome list file, use the calculated max/min read lengths from my other script here?? although were they
+    # calculated from enterococcus?
+    subprocess.run(command, shell=True)
+    os.chdir(cwd)
 
 def unzip(refs_dir):
     """
@@ -61,10 +90,6 @@ def unzip(refs_dir):
                     shutil.copyfileobj(infile, outfile)
             os.remove(file)
 
-def nanosim_h():
-    for reference in reference_list:
-        "nanosim-h {} -p ecoli_R9_1D".format(reference)
-
 def main():
     for key in app_dictionary:
         install_containers.install_tools(key, app_dictionary[key])
@@ -72,7 +97,8 @@ def main():
                          "microbial_refs/"
     download_refs(out_dir = microbial_refs_dir)
     unzip(refs_dir = microbial_refs_dir)
-
+    #nanosim_genome(refs_dir = microbial_refs_dir)
+    #nanosim_metagenome(refs_dir = microbial_refs_dir)
 
 if __name__ == '__main__':
     main()
