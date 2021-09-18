@@ -1,3 +1,7 @@
+"""
+Installs containers required in the pipeline
+"""
+
 import os
 import subprocess
 

@@ -1,3 +1,8 @@
+"""
+Generates simulated monomicrobial and metagenomic datasets from a set of reference genome sequences in a reference
+sequence directory.
+"""
+
 import install_containers
 import wget
 import os
