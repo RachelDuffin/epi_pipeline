@@ -1,6 +1,6 @@
 # Outbreak Analysis Pipeline
 
-This pipeline was created as part of an MSc project. It contains the following steps:
+This pipeline (pipeline.py) was created as part of an MSc project. It contains the following steps:
 
 | Step | Function | Tool |
 | ----------|-----------|-----------|
@@ -9,7 +9,7 @@ This pipeline was created as part of an MSc project. It contains the following s
 | De novo assembly (24 hour analysis) | Assembling reads with no prior knowledge of the correct order of fragments, after 24 hours of sequencing | |
 | Mapping assembly (6 hour analysis)| | |
 
-### Requried inputs, and running the pipeline
+## Requried inputs, and running the pipeline
 
 The pipeline has been written to be run on the Rosalind KCL high performance cluster. Once the code has been pulled, the following directory structure should be replicated:
 
@@ -39,7 +39,7 @@ containing the "pipeline.py" script, the following code should be run:
 python3 pipeline.py
 ```
 
-### Outputs 
+## Outputs 
 The script will create a directory per run within the outputs directory. Within each of these directories, a subdirectory containing the output from each tool will be created. Among these outputs is a MultiQC file per run. 
 
 Resulting output files can then be copied off the cluster using the following command on your personal linux computer:
@@ -47,3 +47,14 @@ Resulting output files can then be copied off the cluster using the following co
 ```
 rsync -avz -partial USERNAME@login.rosalind.kcl.ac.uk:REMOTE_DIRECTORY_PATH LOCAL_DIRECTORY_PATH
 ```
+
+## Assembly testing scripts
+The scripts that were created for testing tools are as follows:
+* test_assemblers.py - tests performance of canu, raven and flye (hard-coded filepaths)
+* test_accuracy.py - compares assembly outputs with reference sequences to determine accuracy (command line 
+input filepaths)
+* count_reads.py - Calculates number of reads and lengths of reads in fastq files and outputs the metrics to text files. 
+Takes input filepaths from a dictionary (hard-coded). 
+* generate_simulated_data.py - generates simulated monomicrobial and metagenomic datasets for testing purposes from 
+reference genomes (in a reference sequence directory). 
+* 
