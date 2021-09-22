@@ -105,6 +105,5 @@ def main():
 
                 run_assembly(command_dictionary[key], input_filepath, sample_name, out_dir, threads)
 
-
 if __name__ == '__main__':
     main()
