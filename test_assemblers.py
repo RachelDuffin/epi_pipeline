@@ -46,7 +46,7 @@ input_filepaths = {
 }
 
 
-def run_assembly(command, input_filepath, sample_name, out_dir, threads):
+def run_assembly(command, input_filepath, sample_name, out_dir, threads, assembler):
     """
     Run test datasets through assemblers with differing numbers of threads to assess scalability, performance and
     accuracy.
@@ -83,12 +83,14 @@ def main():
         if 'enterococcus_faecium' in input_filepath:
             genomeSize = "2.85"
 
-        for key in assembler_dictionary:
-            install_containers.install_tools(key, assembler_dictionary[key]["image"])
+        for assembler in assembler_dictionary:
+            install_containers.install_tools(assembler, assembler_dictionary[assembler])
             out_dir = base_path + input_filepaths[fq] + "{}/".format(assembler)
-            assembly_prefix = "{}_{}_{}_thread".format(sample_name, assembler, threads)
 
             for threads in [8, 4, 2, 1]:
+
+                assembly_prefix = "{}_{}_{}_thread".format(sample_name, assembler, threads)
+
                 command_dictionary = {
                     "flye": ("/usr/bin/time -o {}time_{} -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye "
                              "--nano-raw {} --out-dir {} --meta --threads "
@@ -103,7 +105,8 @@ def main():
                                                        input_filepath, threads)
                 }
 
-                run_assembly(command_dictionary[key], input_filepath, sample_name, out_dir, threads)
+                run_assembly(command_dictionary[assembler], input_filepath, sample_name, out_dir, threads, assembler)
+
 
 if __name__ == '__main__':
     main()
