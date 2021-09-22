@@ -86,17 +86,21 @@ def main():
         for key in assembler_dictionary:
             install_containers.install_tools(key, assembler_dictionary[key]["image"])
             out_dir = base_path + input_filepaths[fq] + "{}/".format(assembler)
+            assembly_prefix = "{}_{}_{}_thread".format(sample_name, assembler, threads)
 
             for threads in [8, 4, 2, 1]:
                 command_dictionary = {
-                    "flye": ("/usr/bin/time -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye "
+                    "flye": ("/usr/bin/time -o {}time_{} -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye "
                              "--nano-raw {} --out-dir {} --meta --threads "
-                             "{}").format(assembler_dictionary["flye"], input_filepath, out_dir, threads),
-                    "canu": ("/usr/bin/time -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye "
+                             "{}").format(out_dir, assembly_prefix, assembler_dictionary["flye"], input_filepath,
+                                          out_dir, threads),
+                    "canu": ("/usr/bin/time -o {}time_{} -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye "
                              "--nano-raw {} --out-dir {} --meta --threads "
-                             "{}").format(assembler_dictionary["canu"], input_filepath, out_dir, threads),
-                    "raven": ("/usr/bin/time -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} raven {} -t "
-                              "{}").format(assembler_dictionary["raven"], input_filepath, threads)
+                             "{}").format(out_dir, assembly_prefix, assembler_dictionary["canu"], input_filepath,
+                                          out_dir, threads),
+                    "raven": ("/usr/bin/time -o {}time_{} -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} "
+                              "raven {} -t {}").format(out_dir, assembly_prefix, assembler_dictionary["raven"],
+                                                       input_filepath, threads)
                 }
 
                 run_assembly(command_dictionary[key], input_filepath, sample_name, out_dir, threads)
