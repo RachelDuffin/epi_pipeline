@@ -16,6 +16,7 @@ This is run multiple times changing the number of threads and observing correspo
 import install_containers
 import subprocess
 import os
+import sys
 
 #"minimap2":
 #"quay.io/biocontainers/minimap2@sha256:7f95eecc8eeee8ef8ae7e24d1d1a49ee056fb21d72aea4e2def97484f8a206c5",
@@ -29,24 +30,33 @@ assembler_dictionary = {
         "quay.io/biocontainers/raven-assembler@sha256:3bc4cc61483cc48243f6b416eaae41f24eb95f75b7a2770f8062c75b5ac53da3"
 }
 
-base_path = "/media/data2/share/outbreak_pipeline/rduffin/outbreak_pipeline/test_data/"
 input_filepaths = {
-    "input/mock_microbial_community/Zymo-GridION-EVEN-BB-SN.fq.gz": "output/assemblers/mock_microbial_community/",
-    "input/mock_microbial_community/Zymo-GridION-LOG-BB-SN.fq.gz": "output/assemblers/mock_microbial_community/",
-    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode01.fq":
-        "output/assemblers/monomicrobial_samples/",
-    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode02.fq":
-        "output/assemblers/monomicrobial_samples/",
-    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode03.fq":
-        "output/assemblers/monomicrobial_samples/",
-    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode04.fq":
-        "output/assemblers/monomicrobial_samples/",
-    "input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode05.fq":
-        "output/assemblers/monomicrobial_samples/"
+    "/input/mock_microbial_community/Zymo-GridION-EVEN-BB-SN.fq.gz": "/output/assemblers/mock_microbial_community/",
+    "/input/mock_microbial_community/Zymo-GridION-LOG-BB-SN.fq.gz": "/output/assemblers/mock_microbial_community/",
+    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode01.fq":
+        "/output/assemblers/monomicrobial_samples/",
+    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode02.fq":
+        "/output/assemblers/monomicrobial_samples/",
+    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode03.fq":
+        "/output/assemblers/monomicrobial_samples/",
+    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode04.fq": 
+        "/output/assemblers/monomicrobial_samples/",
+    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode05.fq":
+        "/output/assemblers/monomicrobial_samples/"
 }
 
 
-def run_assembly(command, input_filepath, sample_name, out_dir, threads, assembler):
+def singularity_pull(tool, image):
+    """
+    Pull singularity images as docker images
+    """
+    print("-------------------------\n PULLING IMAGE FOR {}\n-------------------------------".format(tool))
+    cmd = "module load apps/singularity && singularity pull {}.sif docker://{}".format(tool, image)
+    process = subprocess.Popen(cmd, shell = True)
+    process.wait()
+    print("-----------------------")
+
+def run_assembly(input_filepath, sample_name, out_dir, threads, assembler, base_path, assembly_dir):
     """
     Run test datasets through assemblers with differing numbers of threads to assess scalability, performance and
     accuracy.
@@ -54,59 +64,105 @@ def run_assembly(command, input_filepath, sample_name, out_dir, threads, assembl
     # scalability/performance
     print("--------------------------\n{} DE NOVO ASSEMBLY for {}\n--------------------------".format(assembler,
                                                                                                       input_filepath))
-    # overwrite old file
-    time_file = out_dir + "{}_{}_{}_thread.txt".format(sample_name, assembler, threads)
-    time_output = open(time_file, 'w')
-    time_output.close()
+    # get command and write command to file
+    command = get_command(input_filepath, sample_name, assembler, threads, base_path, assembly_dir)
 
-    with open(time_file, 'a') as filetowrite:
-        stdout, stderr = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE,
-                                          stderr = subprocess.STDOUT).communicate()
-        filetowrite.write(stdout.decode('utf-8')) # change to if statement so only writes if there is stdout
-        # add line writing stderr to a file (if there is a stderr, write to file)
-        # update code to output time output to a separate file
+    with open('command_file.txt', 'a') as command_file:
+        command_file.writelines("SET OFF: " + command + "\n")
+        command_file.close()
 
-    if assembler == "flye":
-        os.rename("{}assembly.fasta".format(out_dir), "{}{}_flye_{}_thread.fasta".format(out_dir, sample_name, threads))
+    os.chdir(assembly_dir)
 
+    # create files for stderr and stdout
+    stdout = assembly_dir + "stdout_{}_{}_{}_thread.txt".format(sample_name, assembler, threads)
+    stderr = assembly_dir + "stderr_{}_{}_{}_thread.txt".format(sample_name, assembler, threads)
+
+    # wipe any existing file
+    for file in stdout, stderr:
+        outfile = open(file, 'w')
+        outfile.close()
+
+    print(command)
+    with open(stdout, 'a') as out_file, open(stderr, 'a') as err_file:
+        process = subprocess.Popen(command, shell = True, universal_newlines=True, bufsize=1,
+                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # wait for process to finish before printing returncode
+        process.wait()
+        print("RETURNCODE: " + str(process.returncode))
+        stdout, stderr = process.communicate()
+
+        # write stderr and stdout to file
+        if stdout:
+            for line in stdout:
+                sys.stdout.write(line)
+                out_file.write(line)
+        if stderr:
+            for line in stderr:
+                sys.stderr.write(line)
+                err_file.write(line)
+
+        out_file.close()
+        err_file.close()
+    os.chdir(base_path)
     print("--------------------------")
 
+def get_command(input_filepath, sample_name, assembler, threads, base_path, assembly_dir):
+    """
+    Returns command to run/append to file
+    """
+    assembly_prefix = "{}_{}_{}_thread".format(sample_name, assembler, threads)
+
+    if 'Zymo' in input_filepath:
+        genomeSize = "6.1944m"
+    if 'enterococcus_faecium' in input_filepath:
+        genomeSize = "2.85m"
+
+    command_dictionary = {
+        "flye": ("module load apps/singularity && /usr/bin/time -o {}time_{}.txt -v singularity exec "
+                 "--bind `pwd`:`pwd` {}/{}.sif flye --nano-raw {} --out-dir {} --meta --threads "
+                 "{}").format(assembly_dir, assembly_prefix, base_path, assembler, input_filepath, assembly_dir,
+                              threads),
+        "canu": ("module load apps/singularity && /usr/bin/time -o {}time_{}.txt -v singularity exec "
+                 "--bind `pwd`:`pwd` {}/{}.sif canu -p {} -d {} genomeSize={} minThreads={} maxThreads={} "
+                 "obtovlThreads={} utgovlThreads={} corThreads={} redThreads={} batThreads={} "
+                 "maxInputCoverage=10000 corOutCoverage=10000 corMhapSensitivity=high corMinCoverage=0 "
+                 "redMemory=32 oeaMemory=32 batMemory=189 "
+                 "-nanopore {}").format(assembly_dir, assembly_prefix, base_path, assembler, assembly_prefix,
+                                        assembly_dir, genomeSize, threads, threads, threads, threads, threads, threads,
+                                        threads, input_filepath),
+        "raven": ("module load apps/singularity && /usr/bin/time -o {}time_{}.txt -v singularity exec "
+                  "--bind `pwd`:`pwd` {}/{}.sif raven {} "
+                  "-t {}").format(assembly_dir, assembly_prefix, base_path, assembler, input_filepath, threads)
+    }
+    return command_dictionary[assembler]
 
 def main():
+    base_path = os.getcwd()
+    # pull images
+    for assembler in assembler_dictionary:
+        singularity_pull(assembler, assembler_dictionary[assembler])
 
+    # overwrite any existing file
+    with open('command_file.txt', 'w') as command_file:
+        command_file.close()
+
+    # Runs assembly for each of the files for each number of threads for each assembler
     for fq in input_filepaths:
+        # parse sample name
         sample_name = str(fq).rsplit("/", 1)[1].rsplit(".")[0]
         input_filepath = base_path + fq
 
-        if 'Zymo' in input_filepath:
-            genomeSize = "6.1944"
-        if 'enterococcus_faecium' in input_filepath:
-            genomeSize = "2.85"
+        for threads in [16, 8, 4, 2, 1]:
+            for assembler in assembler_dictionary:
 
-        for assembler in assembler_dictionary:
-            install_containers.install_tools(assembler, assembler_dictionary[assembler])
-            out_dir = base_path + input_filepaths[fq] + "{}/".format(assembler)
+                out_dir = base_path + input_filepaths[fq] + "{}/".format(assembler)
 
-            for threads in [8, 4, 2, 1]:
+                # create new directory for assembly
+                assembly_dir = "{}{}_{}/".format(out_dir, assembler, threads)
+                if not os.path.isdir(assembly_dir):
+                    os.mkdir(assembly_dir)
 
-                assembly_prefix = "{}_{}_{}_thread".format(sample_name, assembler, threads)
-
-                command_dictionary = {
-                    "flye": ("/usr/bin/time -o {}time_{} -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye "
-                             "--nano-raw {} --out-dir {} --meta --threads "
-                             "{}").format(out_dir, assembly_prefix, assembler_dictionary["flye"], input_filepath,
-                                          out_dir, threads),
-                    "canu": ("/usr/bin/time -o {}time_{} -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} flye "
-                             "--nano-raw {} --out-dir {} --meta --threads "
-                             "{}").format(out_dir, assembly_prefix, assembler_dictionary["canu"], input_filepath,
-                                          out_dir, threads),
-                    "raven": ("/usr/bin/time -o {}time_{} -v sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} "
-                              "raven {} -t {}").format(out_dir, assembly_prefix, assembler_dictionary["raven"],
-                                                       input_filepath, threads)
-                }
-
-                run_assembly(command_dictionary[assembler], input_filepath, sample_name, out_dir, threads, assembler)
-
+                run_assembly(input_filepath, sample_name, out_dir, threads, assembler, base_path, assembly_dir)
 
 if __name__ == '__main__':
     main()
