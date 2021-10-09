@@ -13,7 +13,6 @@ Comparison of performance and memory usage between tools (single thread), using 
 This is run multiple times changing the number of threads and observing corresponding changes in metrics
 (all tools - flye, canu, raven - have multithreading support). The linux box has 20 cores.
 """
-import install_containers
 import subprocess
 import os
 import sys
@@ -63,21 +62,24 @@ def run_assembly(input_filepath, sample_name, threads, assembler, base_path, out
     # scalability/performance
     print("--------------------------\n{} DE NOVO ASSEMBLY for {}\n--------------------------".format(assembler,
                                                                                                       input_filepath))
-    # get command and write command to file
-    command = get_command(input_filepath, sample_name, assembler, threads, base_path, out_dir)
-
-    with open('command_file.txt', 'a') as command_file:
-        command_file.writelines("SET OFF: " + command + "\n")
-        command_file.close()
-
     os.chdir(out_dir)
 
     # create files for stderr and stdout
     stdout = out_dir + "stdout_{}_{}_{}_thread.txt".format(sample_name, assembler, threads)
     stderr = out_dir + "stderr_{}_{}_{}_thread.txt".format(sample_name, assembler, threads)
 
+    # get command
+    command = get_command(input_filepath, sample_name, assembler, threads, base_path, out_dir)
+
     if assembler == "raven":
         command += " > {}".format(stdout)
+
+    # write command to file
+    with open('command_file.txt', 'a') as command_file:
+        command_file.writelines("SET OFF: " + command + "\n")
+        command_file.close()
+
+    if assembler == "raven":
         print(command)
         # wait for process to finish before printing returncode
         process = subprocess.Popen(command, shell=True, universal_newlines=True, stdout=subprocess.PIPE,
@@ -151,8 +153,8 @@ def main():
 
     # Runs assembly for each of the files for each number of threads for each assembler
     for assembler in assembler_dictionary:
-        for threads in [16, 8, 4, 2, 1]:
-            for fq in input_filepaths:
+        for fq in input_filepaths:
+            for threads in [16, 8, 4, 2, 1]:
                 # parse sample name
                 sample_name = str(fq).rsplit("/", 1)[1].rsplit(".")[0]
                 input_filepath = base_path + fq
