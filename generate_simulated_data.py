@@ -3,106 +3,118 @@ Generates simulated monomicrobial and metagenomic datasets from a set of referen
 sequence directory.
 """
 
-import install_containers
-import wget
 import os
 import gzip
 import shutil
 import glob
+import test_assemblers
+import get_reference_sequences
+import subprocess
 
-app_dictionary = {
-    "nanosim": "quay.io/biocontainers/nanosim@sha256:d99389f4fafd8a36547cf5c2a6996a97d929482090682b1a4d070c28069d199b"}
+tool_dict = {
+    "nanosim": "quay.io/biocontainers/nanosim@sha256:d99389f4fafd8a36547cf5c2a6996a97d929482090682b1a4d070c28069d199b",
+    "nanosim-h":
+        "quay.io/biocontainers/nanosim-h@sha256:76e3d6ab85a917623886d04b49504f1c0865dcfb6fa27cf9d8bd1a7145a26150"
+}
 
-reference_list = {"A_baumannii": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Acinetobacter_baumannii/"
-                                "representative/GCF_002116925.1_ASM211692v1/GCF_002116925.1_ASM211692v1_genomic.fna.gz",
-                 "E_cloacae_complex": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Enterobacter_cloacae_complex_sp"
-                                      "./latest_assembly_versions/GCF_900322725.1_C45/GCF_900322725.1_C45_genomic.fna."
-                                      "gz",
-                 "E_coli": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Escherichia_coli/reference/GCF_000005845."
-                           "2_ASM584v2/GCF_000005845.2_ASM584v2_genomic.fna.gz",
-                 "K_pneumoniae": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Klebsiella_pneumoniae/reference/"
-                                 "GCF_000240185.1_ASM24018v2/GCF_000240185.1_ASM24018v2_genomic.fna.gz",
-                 "P_aeruginosa": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Pseudomonas_aeruginosa/reference/"
-                                 "GCF_000006765.1_ASM676v1/GCF_000006765.1_ASM676v1_genomic.fna.gz",
-                 "S_marcescens": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Serratia_marcescens/representative/"
-                                 "GCF_001034395.1_Serr_marc_UCI87_V1/GCF_001034395.1_Serr_marc_UCI87_V1_genomic.fna.gz",
-                 "S_aureus": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Staphylococcus_aureus/reference/"
-                             "GCF_000013425.1_ASM1342v1/GCF_000013425.1_ASM1342v1_genomic.fna.gz",
-                 "E_faecium": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Enterococcus_faecium/representative/"
-                              "GCF_000336405.1_ASM33640v1/GCF_000336405.1_ASM33640v1_genomic.fna.gz"
-                 }
+# median total length of each organism's genome - from refseq. 9/10/2021
+median_genome_length_dict = {
+    "Acinetobacter_baumannii": 3.97473,
+    "Enterobacter_cloacae_complex": 5.03448,
+    "Escherichia_coli": 5.12126,
+    "Klebsiella_pneumoniae": 5.59628,
+    "Pseudomonas_aeruginosa": 6.61337,
+    "Serratia_marcescens": 5.21305,
+    "Staphylococcus_aureus": 2.83686,
+    "Enterococcus_faecium": 2.92265
+}
 
-def download_refs(out_dir):
+def get_error_profile(out_dir):
     """
-    If reference sequence directory is empty, download microbial reference genomes from NCBI using reference_list
-    dictionary.
+    Download the e.coli R9 1D error profile from github NanoSim-H repository, commit position 51fc8cd
     """
-    if not os.listdir(out_dir):
-        for key in reference_list:
-            file_name = str(reference_list[key]).rsplit("/", 1)[1]
-            if os.path.isfile(out_dir + file_name):
-                print(key + " reference already downloaded from NCBI")
-            else:
-                print("\nDownloading reference sequence from NCBI for " + key)
-                wget.download(reference_list[key], out=out_dir)
+    # if error profile is not already downloaded, download it
+    if not os.path.isdir("{}ecoli_R9_1D".format(out_dir)):
+        error_command = "git clone https://github.com/karel-brinda/NanoSim-H.git && cd NanoSim-H && " \
+                        "git reset --hard 51fc8cd && cd .. && " \
+                        "cp -r NanoSim-H/nanosimh/profiles/ecoli_R9_1D/ ecoli_R9_1D && rm -r -f NanoSim-H"
+        process = subprocess.Popen(error_command, shell=True, universal_newlines=True, bufsize=1, stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE)
 
-def nanosim_genome(refs_dir):
+        stdout, stderr = process.communicate()
+
+
+def nanosim_h(refs_dir, reads_per_megabase, median_genome_length_dict, base_path):
     """
     Generate simulated genomic reads per reference genome.
     """
-    print("--------------------------\nGENERATE SIMULATED GENOMIC READS {}\n--------------------------")
-    cwd = pwd()
-    out_dir = "/media/data2/share/outbreak_pipeline/rduffin/outbreak_pipeline/test_data/input/" \
-              "simulated_monomicrobial_reads"
+    out_dir = "{}/input/simulated_monomicrobial_reads/".format(base_path)
+
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+
+    # move to out dir as no out_dir option in command
     os.chdir(out_dir)
-    for reference in glob.glob(refs_dir + "*.fna"):
-        command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} nanosim simulator.py genome -rg {} -n {} " \
-                  "-max {} -min {} -b guppy".format(app_dctionary[nanosim], reference_genome, read_number, max_len,
-                                                    min_len)
-        subprocess.run(command, shell=True)
-    # use the calculated max/min read lengths from my other script here?? although were they calculated from
-    # enterococcus?
-    os.chdir(cwd)
+
+    # download error profile from github repo
+    get_error_profile(out_dir)
+
+    for reference in glob.glob("{}*.fna".format(refs_dir)):
+        print("--------------------------\nGENERATE SIMULATED GENOMIC READS {}\n"
+              "--------------------------".format(reference))
+
+        for microbe in median_genome_length_dict:
+            if microbe in reference:
+                # calculate number of reads for the genome (rounded to nearest integer as required for nanosim-h)
+                read_count = round(median_genome_length_dict[microbe] * reads_per_megabase)
+                # circular option used as all inputs are circular genomes
+
+                #command = "module load apps/singularity && singularity exec --bind `pwd`:`pwd` " \
+                #          "{}/nanosim-h.sif nanosim-h --circular {} -p 'ecoli_R9_1D' -o {} -n {} --max-len 53793 " \
+                #          "--min-len 65".format(base_path, reference, microbe, read_count)
+
+                command = "module load apps/singularity && singularity exec --bind `pwd`:`pwd` " \
+                          "{}/nanosim.sif simulator.py genome -rg {} -c ecoli_R9_2D -n {} -max 53793 " \
+                          "-min 65 -b guppy -dna_type circular -o {} --fastq".format(base_path, reference,
+                                                                                     read_count, microbe)
+
+                process = subprocess.Popen(command, shell=True, universal_newlines=True, bufsize=1,
+                                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                stdout, stderr = process.communicate()
+
+    os.chdir(base_path)
     print("--------------------------")
 
 def nanosim_metagenome(refs_dir):
     """
     Generate simulated metagenomic reads per reference genome.
     """
-    cwd = pwd()
     out_dir = "/media/data2/share/outbreak_pipeline/rduffin/outbreak_pipeline/test_data/input/" \
               "simulated_metagenomic_reads"
     os.chdir(out_dir)
     command = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} nanosim simulator.py metagenome -gl {} -n {} " \
-                  "-max {} -min {} -b guppy".format(app_dctionary[nanosim], genome_list, read_number, max_len, min_len)
+                  "-max {} -min {} -b guppy".format(tool_dict[nanosim], genome_list, read_number, max_len, min_len)
     # create genome list file, use the calculated max/min read lengths from my other script here?? although were they
     # calculated from enterococcus?
     subprocess.run(command, shell=True)
     os.chdir(cwd)
 
-def unzip(refs_dir):
-    """
-    Unzip microbial reference genomes in specified directory.
-    """
-    for file in glob.glob(refs_dir + "*.gz"):
-        unzipped_name = str(file).rsplit(".gz", 1)[0]
-        if os.path.isfile(unzipped_name):
-            print(unzipped_name + " already exists.")
-        else:
-            print("Unzipping " + file)
-            with gzip.open(file, 'rb') as infile:
-                with open(unzipped_name, 'wb') as outfile:
-                    shutil.copyfileobj(infile, outfile)
-            os.remove(file)
 
 def main():
-    for key in app_dictionary:
-        install_containers.install_tools(key, app_dictionary[key])
-    microbial_refs_dir = "/media/data2/share/outbreak_pipeline/rduffin/outbreak_pipeline/test_data/input/" \
-                         "microbial_refs/"
-    download_refs(out_dir = microbial_refs_dir)
-    unzip(refs_dir = microbial_refs_dir)
-    #nanosim_genome(refs_dir = microbial_refs_dir)
+
+    base_path = os.getcwd()
+    # reads per megabase calculated using the average read count from test data, and the median read length for
+    # e.faecium from refseq (9/10/2021)
+    reads_per_megabase = 76382
+    for tool in tool_dict:
+        test_assemblers.singularity_pull(tool, tool_dict[tool])
+
+    # Download reference sequences
+    microbial_refs_dir = "{}/input/reference_sequences/".format(base_path)
+    get_reference_sequences.download_sequences(get_reference_sequences.refseq_dict, microbial_refs_dir)
+
+    nanosim_h(microbial_refs_dir, reads_per_megabase, median_genome_length_dict, base_path)
     #nanosim_metagenome(refs_dir = microbial_refs_dir)
 
 if __name__ == '__main__':
