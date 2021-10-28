@@ -1,7 +1,7 @@
 import subprocess
+import os
 
-file_dictionary = {"monoisolates": {"file_path": "/mnt/flavia/rduffin/outbreak_pipeline/test_data/input/"
-                                                 "enterococcus_faecium/enterococcus/",
+file_dictionary = {"monoisolates": {"file_path": "/input/enterococcus_faecium/enterococcus/",
                                     "files": ["ef1_bc_75/210612_EF_R1_barcode01.fq",
                                               "ef1_bc_75/210612_EF_R1_barcode02.fq",
                                               "ef1_bc_75/210612_EF_R1_barcode03.fq",
@@ -24,7 +24,7 @@ file_dictionary = {"monoisolates": {"file_path": "/mnt/flavia/rduffin/outbreak_p
                                               "ef2_bc_75/210612_EF_R2_barcode09.fq",
                                               "ef2_bc_75/210612_EF_R2_barcode10.fq"]
                                     },
-                   "metagenomics": {"file_path": "/mnt/flavia/rduffin/outbreak_pipeline/output/",
+                   "metagenomics": {"file_path": "/output/",
                                     "files": ["200408_CMG_RUN3_Pool3/human_read_removal/"
                                               "200408_CMG_RUN3_Pool3_barcode01_unmapped.fastq",
                                               "200416_CMG_RUN4_Pool6/human_read_removal/"
@@ -91,14 +91,18 @@ def calculate_read_length(sample_type, fastq_list, file_path):
                                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
             filetowrite.write(stdout.decode('ascii'))
         filetowrite.close()
-
+    with open("median_read_length_{}.txt".format(sample_type), 'a') as filetowrite:
+        stdout, stderr = subprocess.Popen("" + "read_length_{}.txt".format(sample_type)).communicate()
+        filetowrite.write(stdout.decode('ascii'))
+        filetowrite.close()
 
 def main():
     for key in file_dictionary:
+        base_path = os.getcwd()
         count_reads(sample_type=key, fastq_list=file_dictionary[key]["files"],
-                    file_path=file_dictionary[key]["file_path"])
+                    file_path=base_path + file_dictionary[key]["file_path"])
         calculate_read_length(sample_type=key, fastq_list=file_dictionary[key]["files"],
-                              file_path=file_dictionary[key]["file_path"])
+                              file_path=base_path + file_dictionary[key]["file_path"])
 
 
 if __name__ == '__main__':
