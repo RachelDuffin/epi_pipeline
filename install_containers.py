@@ -18,6 +18,9 @@ app_dictionary = {
     "medaka": "quay.io/biocontainers/medaka@sha256:6aa52d718af0f48cf6630e88b22cd7187770bbf028ef89bc54ec7fad2ff7a35f",
     "flye": "quay.io/biocontainers/flye@sha256:f895c72298ea3ae568c265cfb575fefeca768c42870cfea0ef3a4cfc35704086",
     "mlst": "quay.io/biocontainers/mlst@sha256:d8d8e731f165df398d95ad0969333aef45bcae678da11a26a1d2e76d44bc2698",
+    "mlstcheck" : 
+        "quay.io/biocontainers/perl-bio-mlst-check@sha256:"
+        "828f4a536603a39559118a279e9c66d71e83a155cf0ac824efdb9339ba59e201",
     "snp-sites":
         "quay.io/biocontainers/snp-sites@sha256:02c868581e36f97cc16f066f0ef4c2d169873ca4cf6932a104beb10c828a9c5c",
     "snp-dists":
@@ -38,11 +41,11 @@ def install_tools(key, value):
     Checks if docker image specified in app_dictionary already exists, if not pulls from biocontainers
     """
     print("--------------------------\nInstalling docker images\n--------------------------")
-    if subprocess.check_output("sudo docker images -q " + value, shell=True):
+    if subprocess.check_output("docker images -q " + value, shell=True):
         print(key + " docker image already pulled")
     else:
         print("Installing " + key)
-        os.system("sudo docker image pull " + value)
+        os.system("docker image pull " + value)
     print("----------------------------")
 
 
