@@ -67,6 +67,7 @@ def download_sequences(dictionary, out_dir):
     Checks if download already exists. If it doesn't, download the file, get the file name by splitting the dictionary
     value, and append bacterial name to start using the dictionary key.
     """
+    print("--------------------------\nDOWNLOADING REFERENCE SEQUENCES\n--------------------------")
     for key in dictionary:
         file_name = str(dictionary[key]).rsplit("/", 1)[1]
         filepath= "{}{}_{}".format(out_dir, key, file_name)
@@ -86,6 +87,7 @@ def download_sequences(dictionary, out_dir):
             os.remove(filepath)
         else:
             print("REFERENCE FILE ALREADY DOWNLOADED FROM NCBI: {}".format(key))
+    print("--------------------------")
 
 
 def main():

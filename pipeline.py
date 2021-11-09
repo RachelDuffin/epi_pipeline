@@ -107,7 +107,7 @@ def human_read_removal(data_dir, out_dir, run_id, ref):
         else:
             # align reads to human reference genome using ont-specific parameters
             print("Aligning reads to human reference genome for {}".format(file))
-            minimap2_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} minimap2 -ax map-ont {} {} -o " \
+            minimap2_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} minimap2 -ax map-ont {} {} -o " \
                                "{}_aligned.sam".format(app_dictionary["minimap2"], ref, file, out_path)
             subprocess.run(minimap2_command, shell=True)
         if os.path.isfile("{}_unmapped.fastq".format(out_path)):
@@ -147,14 +147,19 @@ def centrifuge_index(cwd):
     if all([os.path.isfile("{}/{}/{}/taxonomy/{}".format(cwd, data_dir, directory, file)) for file in filelist]):
         print("Centrifuge database already downloaded")
     else:
-        print("Downloading database...")
         # masks low complexity regions using -m
         # only downloads species from the bacteria domain, matching the listed taxa IDs
-        centrifuge_download = "sudo centrifuge-download -o taxonomy taxonomy ; sudo centrifuge-download -o " \
-                              "library -m -d 'bacteria' -t 1352,354276,562,573,287,615,1280,1352 refseq > " \
-                              "seqid2taxid.map"
-        subprocess.run(centrifuge_download, shell=True)
-        "1352 354276 562 573 287 615 1280 1352"
+        centrifuge_taxonomy = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} " \
+                              "centrifuge-download -o taxonomy taxonomy".format(app_dictionary["centrifuge"])
+        centrifuge_library = "sudo docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} centrifuge-download -o library -m " \
+                             "-d 'bacteria' -t 1352,354276,562,573,287,615,1280,1352 refseq > " \
+                             "seqid2taxid.map".format(app_dictionary["centrifuge"])
+
+        print("Downloading taxonomy...")
+        subprocess.run(centrifuge_taxonomy, shell=True)
+        print("Downloading reference sequences...")
+        subprocess.run(centrifuge_library, shell=True)
+
 
     print("--------------------------\nCREATE CENTRIFUGE INDEX\n--------------------------")
     if os.path.isfile("{}/input-sequences.fna".format(centrifuge_dir)):
@@ -165,17 +170,28 @@ def centrifuge_index(cwd):
         subprocess.run(index, shell=True)
 
     print("Building index...")
-    centrifuge_build = "centrifuge-build -p 4 --conversion-table seqid2taxid.map --taxonomy-tree taxonomy/nodes.dmp " \
-                       "--name-table taxonomy/names.dmp input-sequences.fna index"
+    centrifuge_build = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} centrifuge-build -p 4 --conversion-table " \
+                       "seqid2taxid.map --taxonomy-tree taxonomy/nodes.dmp --name-table taxonomy/names.dmp " \
+                       "input-sequences.fna index".format(app_dictionary["centrifuge"])
     subprocess.run(centrifuge_build, shell = True)
-    os.chdir(cwd)
+    # need to add some way to parse the centrifuge output and use this to filter the input reads to return only those
+    # that returned a classification from centrifuge (i.e. are from the species of interest)
 
 
 def classification(cwd):
     """
     Centrifuge classification
+    Call centrifuge_index to create the index if not already created
+    Call centrifuge
     """
+    # create centrifuge index
     centrifuge_index(cwd)
+    # run centrifuge-inspect to output a summary of the index used for classification
+    centrifuge_inspect = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} centrifuge-inspect -s " \
+                         "index".format(app_dictionary["centrifuge"])
+    os.chdir(cwd)
+    subprocess.run(centrifuge_inspect, shell = True)
+
 
 
 def de_novo_assembly(data_dir, out_dir, run_id, cwd):
