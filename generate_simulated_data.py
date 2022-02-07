@@ -10,6 +10,7 @@ import glob
 import test_assemblers
 import get_reference_sequences
 import subprocess
+import config
 
 tool_dict = {
     "nanosim": "quay.io/biocontainers/nanosim@sha256:d99389f4fafd8a36547cf5c2a6996a97d929482090682b1a4d070c28069d199b",
@@ -38,8 +39,8 @@ def get_error_profile(out_dir):
         error_command = "git clone https://github.com/karel-brinda/NanoSim-H.git && cd NanoSim-H && " \
                         "git reset --hard 51fc8cd && cd .. && " \
                         "cp -r NanoSim-H/nanosimh/profiles/ecoli_R9_1D/ ecoli_R9_1D && rm -r -f NanoSim-H"
-        process = subprocess.Popen(error_command, shell=True, universal_newlines=True, bufsize=1, stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE)
+        process = subprocess.Popen(error_command, shell=True, universal_newlines=True, bufsize=1,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
         stdout, stderr = process.communicate()
 
@@ -111,8 +112,8 @@ def main():
         test_assemblers.singularity_pull(tool, tool_dict[tool])
 
     # Download reference sequences
-    microbial_refs_dir = "{}/input/reference_sequences/".format(base_path)
-    get_reference_sequences.download_sequences(get_reference_sequences.refseq_dict, microbial_refs_dir)
+    microbial_refs_dir = "{}/data/reference_sequences/".format(base_path)
+    get_reference_sequences.download_sequences(config.refseq_dict, microbial_refs_dir)
 
     nanosim_h(microbial_refs_dir, reads_per_megabase, median_genome_length_dict, base_path)
     #nanosim_metagenome(refs_dir = microbial_refs_dir)
