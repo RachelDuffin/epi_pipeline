@@ -17,11 +17,6 @@ import subprocess
 import os
 import sys
 
-#"minimap2":
-#"quay.io/biocontainers/minimap2@sha256:7f95eecc8eeee8ef8ae7e24d1d1a49ee056fb21d72aea4e2def97484f8a206c5",
-#"racon": "quay.io/biocontainers/racon@sha256:16b6aeb33ee2ac726d313a9de3788adff305e24c07bfeee9f1800c060627b414",
-#"medaka": "quay.io/biocontainers/medaka@sha256:6aa52d718af0f48cf6630e88b22cd7187770bbf028ef89bc54ec7fad2ff7a35f"
-
 assembler_dictionary = {
     "raven":
         "quay.io/biocontainers/raven-assembler@sha256:3bc4cc61483cc48243f6b416eaae41f24eb95f75b7a2770f8062c75b5ac53da3",
@@ -30,18 +25,18 @@ assembler_dictionary = {
 }
 
 input_filepaths = {
-    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode01.fq":
+    "/data/monomicrobial_samples/enterococcus_faecium/ef1_bc_75/210612_EF_R1_barcode01.fq":
         "/output/assemblers/monomicrobial_samples/",
-    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode02.fq":
+    "/data/monomicrobial_samples/enterococcus_faecium/ef1_bc_75/210612_EF_R1_barcode02.fq":
         "/output/assemblers/monomicrobial_samples/",
-    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode03.fq":
+    "/data/monomicrobial_samples/enterococcus_faecium/ef1_bc_75/210612_EF_R1_barcode03.fq":
+        "/data/monomicrobial_samples/assemblers/monomicrobial_samples/",
+    "/data/monomicrobial_samples/enterococcus_faecium/ef1_bc_75/210612_EF_R1_barcode04.fq":
         "/output/assemblers/monomicrobial_samples/",
-    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode04.fq": 
+    "/data/monomicrobial_samples/enterococcus_faecium/ef1_bc_75/210612_EF_R1_barcode05.fq":
         "/output/assemblers/monomicrobial_samples/",
-    "/input/enterococcus_faecium/enterococcus/ef1_bc_75/210612_EF_R1_barcode05.fq":
-        "/output/assemblers/monomicrobial_samples/",
-    "/input/mock_microbial_community/Zymo-GridION-EVEN-BB-SN.fq.gz": "/output/assemblers/mock_microbial_community/",
-    "/input/mock_microbial_community/Zymo-GridION-LOG-BB-SN.fq.gz": "/output/assemblers/mock_microbial_community/"
+    "/data/monomicrobial_samples/Zymo-GridION-EVEN-BB-SN.fq.gz": "/output/assemblers/mock_microbial_community/",
+    "/data/monomicrobial_samples/Zymo-GridION-LOG-BB-SN.fq.gz": "/output/assemblers/mock_microbial_community/"
 }
 
 def singularity_pull(tool, image):
@@ -150,7 +145,7 @@ def get_command(input_filepath, sample_name, assembler, threads, base_path, out_
         return command_dictionary[assembler]
 
 def main():
-    base_path = os.getcwd()
+    base_path = os.getcwd().rsplit('/', 2)[0]
     # pull images
     for assembler in assembler_dictionary:
         singularity_pull(assembler, assembler_dictionary[assembler])

@@ -6,7 +6,7 @@ import gzip
 import shutil
 import config
 
-def download_sequences(dictionary, out_dir, base_path):
+def download_sequences(dictionary, out_dir):
     """
     Download all sequences in supplied dictionary.
 
@@ -32,20 +32,4 @@ def download_sequences(dictionary, out_dir, base_path):
             # remove zipped file
             os.remove(filepath)
         else:
-<<<<<<< HEAD
             print("REFERENCE FILE ALREADY DOWNLOADED FROM NCBI: {}".format(key))
-=======
-            print("REFERENCE FILE ALREADY DOWNLOADED FROM NCBI: {}".format(key))
-        os.chdir(base_path)
-    print("--------------------------")
-
-
-def main():
-    base_path = os.getcwd()
-    out_dir = "{}/input/reference_sequences/".format(base_path)
-    download_sequences(refseq_test_dict, out_dir, base_path)
-    download_sequences(refseq_dict, out_dir, base_path)
-
-if __name__ == '__main__':
-    main()
->>>>>>> b782db751dd3e6341c28d65a3745f3ac3fed1774

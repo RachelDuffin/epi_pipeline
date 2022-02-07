@@ -127,7 +127,7 @@ def calculate_length_summary(sample_type):
 
 def main():
     for sample_type in file_dictionary:
-        base_path = os.getcwd()
+        base_path = os.getcwd().rsplit('/', 2)[0]
         file_path = base_path + file_dictionary[sample_type]["file_path"]
         fastq_list = file_dictionary[sample_type]["files"]
         calculate_read_length(sample_type, fastq_list, file_path)

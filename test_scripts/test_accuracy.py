@@ -85,7 +85,7 @@ def get_file_list(path, assembler, pattern):
 
 def main():
     #args = arg_parse()
-    base_path = os.getcwd()
+    base_path = os.getcwd().rsplit('/', 2)[0]
 
     for tool in tool_dict:
         test_assemblers.singularity_pull(tool, tool_dict[tool])
@@ -93,10 +93,10 @@ def main():
     # find all files that match
     assemblers = ["flye", "raven", "canu"]
 
-    ref_seq = "/users/k1927570/outbreak_pipeline/msc_project/input/reference_sequences/" + \
-              "Enterococcus_faecium_GCF_009734005.1_ASM973400v2_genomic.fna"
+    ref_seq = "{}/data/reference_sequences/" \
+              "Enterococcus_faecium_GCF_009734005.1_ASM973400v2_genomic.fna".format(base_path)
     # directory containing fastas to compare
-    dir = base_path + "/output/assemblers/monomicrobial_samples"
+    dir = base_path + "{}/output/assemblers/monomicrobial_samples".format(base_path)
 
     # run comparisons for enterococcus samples
     for assembler in pattern_dict:

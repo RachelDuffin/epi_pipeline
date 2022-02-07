@@ -80,7 +80,7 @@ class Pipeline:
 
             # get any reference material that isn't already present
             self.get_centrifuge_index()
-            get_reference_sequences.download_sequences(get_reference_sequences.refseq_dict, self.reference_dir)
+            get_reference_sequences.download_sequences(config.refseq_dict, self.reference_dir)
 
             self.logger().info("ANALYSING RUN {}".format(self.run))
 

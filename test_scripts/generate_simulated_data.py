@@ -30,11 +30,10 @@ median_genome_length_dict = {
     "Enterococcus_faecium": 2.92265
 }
 
-def generate_error_profile(infile, out_dir, refs_dir, base_path):
+def get_error_profile(infile, out_dir, refs_dir, base_path):
     """
     Generate error profile using test data.
     """
-<<<<<<< HEAD
     # if error profile is not already downloaded, download it
     if not os.path.isdir("{}ecoli_R9_1D".format(out_dir)):
         error_command = "git clone https://github.com/karel-brinda/NanoSim-H.git && cd NanoSim-H && " \
@@ -42,30 +41,6 @@ def generate_error_profile(infile, out_dir, refs_dir, base_path):
                         "cp -r NanoSim-H/nanosimh/profiles/ecoli_R9_1D/ ecoli_R9_1D && rm -r -f NanoSim-H"
         process = subprocess.Popen(error_command, shell=True, universal_newlines=True, bufsize=1,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-=======
-    print("--------------------------\nGENERATE E.FAECIUM ERROR PROFILE\n--------------------------")
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-
-    # get reference genome file
-    for reference in glob.glob("{}*.fna".format(refs_dir)):
-        if "Enterococcus_faecium" in reference:
-            ref_genome = reference
-
-    os.chdir(out_dir)
->>>>>>> b782db751dd3e6341c28d65a3745f3ac3fed1774
-
-    # if error profile is not already generated, generate it
-    if not os.listdir(out_dir):
-        error_command = "module load apps/singularity && singularity exec --bind `pwd`:`pwd` {}/nanosim.sif " \
-                        "read_analysis.py genome -i {} -rg {} -a minimap2 -o " \
-                        "Enterococcus_faecium".format(base_path, infile, ref_genome)
-        print(error_command)
-        run_process(error_command)
-
-     #   error_command = "git clone https://github.com/karel-brinda/NanoSim-H.git && cd NanoSim-H && " \
-      #                  "git reset --hard 51fc8cd && cd .. && " \
-       #                 "cp -r NanoSim-H/nanosimh/profiles/ecoli_R9_1D/ ecoli_R9_1D && rm -r -f NanoSim-H"
     print("--------------------------")
 
 
@@ -137,10 +112,6 @@ def main():
         test_assemblers.singularity_pull(tool, tool_dict[tool])
 
     # Download reference sequences
-<<<<<<< HEAD
-    microbial_refs_dir = "{}/data/reference_sequences/".format(base_path)
-    get_reference_sequences.download_sequences(config.refseq_dict, microbial_refs_dir)
-=======
     microbial_refs_dir = "{}/input/reference_sequences/".format(base_path)
     input_dir = "/users/k1927570/outbreak_pipeline/msc_project/input/"
     out_dir = "{}/input/simulated_monomicrobial_reads/".format(base_path)
@@ -152,8 +123,7 @@ def main():
 
     get_reference_sequences.download_sequences(get_reference_sequences.refseq_dict, microbial_refs_dir, base_path)
 
-    generate_error_profile(error_profile_input, error_profile_outdir, microbial_refs_dir, base_path)
->>>>>>> b782db751dd3e6341c28d65a3745f3ac3fed1774
+    get_error_profile(error_profile_input, error_profile_outdir, microbial_refs_dir, base_path)
 
     nanosim(microbial_refs_dir, reads_per_megabase, median_genome_length_dict, base_path, out_dir, error_profile_outdir)
     #nanosim_metagenome(refs_dir = microbial_refs_dir)
