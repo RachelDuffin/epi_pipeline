@@ -1,13 +1,12 @@
 """
 Script to download required reference sequences from NCBI refseq for all scripts.
 """
-import requests
 import os
 import gzip
 import shutil
 import config
 
-def download_sequences(dictionary, out_dir):
+def download_sequences(dictionary, out_dir, base_path):
     """
     Download all sequences in supplied dictionary.
 
@@ -23,8 +22,8 @@ def download_sequences(dictionary, out_dir):
         # download file
         if not os.path.exists(unzipped_file):
             print("Downloading: {} refseq file".format(key))
-            request = requests.get(dictionary[key])
-            open(filepath, 'wb').write(request.content)
+            command  = "wget -cO - {} > {}".format(dictionary[key], filepath)
+            subprocess.run(command, shell=True)
             print("Download complete: {} refseq file".format(key))
             # unzip file
             with gzip.open(filepath, 'rb') as f_in:
@@ -33,4 +32,20 @@ def download_sequences(dictionary, out_dir):
             # remove zipped file
             os.remove(filepath)
         else:
+<<<<<<< HEAD
             print("REFERENCE FILE ALREADY DOWNLOADED FROM NCBI: {}".format(key))
+=======
+            print("REFERENCE FILE ALREADY DOWNLOADED FROM NCBI: {}".format(key))
+        os.chdir(base_path)
+    print("--------------------------")
+
+
+def main():
+    base_path = os.getcwd()
+    out_dir = "{}/input/reference_sequences/".format(base_path)
+    download_sequences(refseq_test_dict, out_dir, base_path)
+    download_sequences(refseq_dict, out_dir, base_path)
+
+if __name__ == '__main__':
+    main()
+>>>>>>> b782db751dd3e6341c28d65a3745f3ac3fed1774

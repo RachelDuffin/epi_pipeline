@@ -25,8 +25,8 @@ import sys
 assembler_dictionary = {
     "raven":
         "quay.io/biocontainers/raven-assembler@sha256:3bc4cc61483cc48243f6b416eaae41f24eb95f75b7a2770f8062c75b5ac53da3",
-    "canu": "quay.io/biocontainers/canu@sha256:b48b52afc355477015ef60bebded3b4ab3d3099bbf5698879de8eb600c9ff1a4",
-    "flye": "quay.io/biocontainers/flye@sha256:f895c72298ea3ae568c265cfb575fefeca768c42870cfea0ef3a4cfc35704086"
+    "flye": "quay.io/biocontainers/flye@sha256:f895c72298ea3ae568c265cfb575fefeca768c42870cfea0ef3a4cfc35704086",
+    "canu": "quay.io/biocontainers/canu@sha256:b48b52afc355477015ef60bebded3b4ab3d3099bbf5698879de8eb600c9ff1a4"
 }
 
 input_filepaths = {
@@ -136,10 +136,18 @@ def get_command(input_filepath, sample_name, assembler, threads, base_path, out_
                                         genomeSize, threads, input_filepath),
         "raven": ("module load apps/singularity && /usr/bin/time -o {}time_{}.txt -v singularity exec "
                   "--bind `pwd`:`pwd` {}/{}.sif raven {} "
-                  "-t {}").format(out_dir, assembly_prefix, base_path, assembler, input_filepath, threads)
+                  "-t {}").format(out_dir, assembly_prefix, base_path, assembler, input_filepath, threads),
+        "canu_2_1": ("module load apps/singularity && /usr/bin/time -o {}time_{}.txt -v singularity exec "
+                     "--bind `pwd`:`pwd` {}/{}.sif canu -p {} -d {} genomeSize={} maxThreads={} corThreads={} "
+                     "maxInputCoverage=10000 corOutCoverage=10000 corMhapSensitivity=high corMinCoverage=0 "
+                     "-nanopore {}").format(out_dir, assembly_prefix, base_path, assembler, assembly_prefix, out_dir,
+                                            genomeSize, threads, threads, input_filepath)
     }
-    return command_dictionary[assembler]
-
+    if assembler == "canu" and threads in (2,1):
+        print(assembler, threads)
+        return command_dictionary["canu_2_1"]
+    else:
+        return command_dictionary[assembler]
 
 def main():
     base_path = os.getcwd()
