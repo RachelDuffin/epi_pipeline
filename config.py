@@ -9,9 +9,6 @@ if TEST:
 else:
     runfolders = "{}/data/run_folders".format(base_dir)
 
-reference_genome = "{}/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna".format(base_dir)
-
-
 app_dictionary = {
     "fastqc": "quay.io/biocontainers/fastqc@sha256:319b8d4eca0fc0367d192941f221f7fcd29a6b96996c63cbf8931dbb66e53348",
     "multiqc": "quay.io/biocontainers/multiqc@sha256:2c3362c12409ca8f06f182c35cf8a804ee23cf8a32dc02c952fa60bc6e48db96",
@@ -22,9 +19,6 @@ app_dictionary = {
         "quay.io/biocontainers/samtools@sha256:2b911396b907769945a5446c8779d7be83f999bb4211733a8259040e67f4065f",
     "flye": "quay.io/biocontainers/flye@sha256:f895c72298ea3ae568c265cfb575fefeca768c42870cfea0ef3a4cfc35704086",
     "mlst": "quay.io/biocontainers/mlst@sha256:d8d8e731f165df398d95ad0969333aef45bcae678da11a26a1d2e76d44bc2698",
-    "mlstcheck" :
-        "quay.io/biocontainers/perl-bio-mlst-check@sha256:"
-        "828f4a536603a39559118a279e9c66d71e83a155cf0ac824efdb9339ba59e201",
     "snp-sites":
         "quay.io/biocontainers/snp-sites@sha256:02c868581e36f97cc16f066f0ef4c2d169873ca4cf6932a104beb10c828a9c5c",
     "snp-dists":
@@ -34,6 +28,9 @@ app_dictionary = {
     "pyfaidx":
         "quay.io/biocontainers/pyfaidx@sha256:96bfff4ed96cb9149c54d21d6ea8d6d9eadcb4c0838b8e27df4b929cb5fe4e2f"
 }
+# "mlstcheck" :
+#         "quay.io/biocontainers/perl-bio-mlst-check@sha256:"
+#         "828f4a536603a39559118a279e9c66d71e83a155cf0ac824efdb9339ba59e201",
 
 
 refseq_dict = {

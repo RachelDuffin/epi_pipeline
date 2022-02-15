@@ -5,6 +5,7 @@ import os
 import gzip
 import shutil
 import config
+import subprocess
 
 def download_sequences(dictionary, out_dir):
     """
@@ -16,7 +17,7 @@ def download_sequences(dictionary, out_dir):
     print("--------------------------\nDOWNLOADING REFERENCE SEQUENCES\n--------------------------")
     for key in dictionary:
         file_name = str(dictionary[key]).rsplit("/", 1)[1]
-        filepath= "{}{}_{}".format(out_dir, key, file_name)
+        filepath= "{}/{}_{}".format(out_dir, key, file_name)
         unzipped_file = str(filepath).rsplit(".gz", 1)[0]
 
         # download file
