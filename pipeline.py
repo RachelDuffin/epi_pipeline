@@ -47,8 +47,8 @@ class Pipeline:
         self.out_dir = out_dir
         self.runfolder_out = "{}/{}".format(out_dir, self.run)
         self.centrifuge_index_summary = "{}/centrifuge_index_summary.txt".format(self.runfolder_out)
-        self.out_subdirs = ["QC", "human_read_removal", "de_novo_assembly", "mlst", "snp-sites",
-                           "snp-dists", "centrifuge", "split_assemblies", "multiqc"]
+        self.out_subdirs = ["QC", "human_read_removal", "de_novo_assembly", "split_assemblies", "snp-sites",
+                           "snp-dists", "centrifuge", "split_barcodes", "passing_contigs"]
 
         self.hr_rem_dir = "{}/human_read_removal".format(self.runfolder_out)
         self.class_dir = "{}/centrifuge".format(self.runfolder_out)
@@ -56,9 +56,9 @@ class Pipeline:
         self.index = "{}//p_compressed+h+v".format(self.index_dir)
         self.assembly_dir = "{}/de_novo_assembly".format(self.runfolder_out)
         self.assembly_split_dir = "{}/split_assemblies".format(self.runfolder_out)
-        self.mlst_dir = "{}/mlst".format(self.runfolder_out)
         self.qc_dir = "{}/QC".format(self.runfolder_out)
-        self.multiqc_dir = "{}/multiqc".format(self.runfolder_out)
+        self.split_barcodes_dir = "{}/split_barcodes".format(self.runfolder_out)
+        self.passing_contigs_dir = "{}/passing_contigs".format(self.runfolder_out)
 
         self.logfile = "{}/{}_logfile.txt".format(self.runfolder_out, self.run_id)
 
@@ -88,30 +88,39 @@ class Pipeline:
             self.get_centrifuge_index()
             get_reference_sequences.download_sequences(config.refseq_dict, self.reference_dir)
 
-            self.logger().info("ANALYSING RUN {}".format(self.run))
-            # run pycoqc for whole run
-            self.pycoqc()
+            logger(self.logfile).info("ANALYSING RUN {}".format(self.run))
+            # split barcodes for whole run
+            self.split_barcodes()
 
             for fastq in glob.glob(self.fastq_path):
 
                 barcode = self.get_identifier(file_list=[fastq], string="barcode")
                 run_barcode = "{}_{}".format(self.run_id, barcode)
 
-                self.fastqc(fastq, run_barcode)
+                # run pre-alignment QC tools
+                self.pycoqc(run_barcode, barcode)
+                self.fastqc(fastq, run_barcode, barcode)
+
+                # conduct human read removal
                 unmapped_fastq = self.human_read_removal(fastq, run_barcode)
                 self.classification(run_barcode, unmapped_fastq)
                 assembly, assembly_outdir = self.de_novo_assembly(run_barcode, unmapped_fastq)
+
                 # get dictionary of contigs that pass coverage requirements
-                # passing_contigs = self.get_passing_contigs(run_barcode, assembly_outdir)
+                passing_contigs = self.get_passing_contigs(run_barcode, assembly_outdir)
 
-                #assembly_dict = self.assembly_split(run_barcode, assembly, assembly_outdir, passing_contigs)
+                # get list of all filepaths containing passing contigs
+                assembly_list = self.assembly_split(run_barcode, assembly, assembly_outdir, passing_contigs)
+                # concatenate into a single passing contigs file
+                passing_contigs_fq = self.concatenate_sequences(assembly_list, run_barcode)
 
-                self.mlst(run_barcode, assembly)
+                fq_headers_renamed = self.rename_headers(run_barcode, passing_contigs_fq)
 
                     # genetic_distance(out_dir=out_dir, run_id=run_id)
                     # variant_calling(out_dir=out_dir, run_id=run_id)
-            self.multiqc(run_barcode)
                     # report_generation()
+        return
+
 
     def get_passing_contigs(self, run_barcode, assembly_outdir):
         """
@@ -121,18 +130,19 @@ class Pipeline:
         assembly_info = "{}/assembly_info.txt".format(assembly_outdir)
 
         if os.path.isfile(assembly_info):
-            self.logger().info("PARSE ASSEMBLY INFO: Parsing assembly info file for {}".format(run_barcode))
+            logger(self.logfile).info("PARSE ASSEMBLY INFO: Parsing assembly info file for {}".format(run_barcode))
             with open(assembly_info, "r") as file:
                 for line in file.readlines():
                     if not line.startswith("#seq_name"):
                         line = line.split("\t")
                         coverage = int(line[2])
                         if coverage >= 60:
-                            contig_list.append(line[0])
+                            contig_list.append("{}.".format(line[0]))
         else:
-            self.logger().warning("PARSE ASSEMBLY INFO: Assembly info file does not exist for {}".format(run_barcode))
-
+            logger(self.logfile).warning("PARSE ASSEMBLY INFO: Assembly info "
+                                         "file does not exist for {}".format(run_barcode))
         return contig_list
+
 
     @staticmethod
     def get_identifier(file_list, string):
@@ -155,120 +165,143 @@ class Pipeline:
         return identifier
 
 
-    def pycoqc(self):
+    def pycoqc(self, run_barcode, barcode):
         """
-        Using guppy barcoding file. Checks if barcodes already split, if not calls split_barcodes() function.
         Then creates a pycoQC json report per barcode.
         """
-        # If pycoQC not yet run, split the summary sequencing files according to barcodes and run pycoQC
-        if not os.path.isfile("{}/{}_pycoQC_output.json".format(self.qc_dir, self.run_id)):
-            # specify output directories
-            self.split_barcodes()
+        # If pycoQC not yet run, run pycoQC
+        sequencing_summary_file = "{}/sequencing_summary_{}.txt".format(self.split_barcodes_dir, barcode)
+        pycoqc_outfile = "{}/{}_pycoQC_output.json".format(self.qc_dir, run_barcode)
 
-            for file in glob.glob("{}/sequencing_summary_*".format(self.runfolder)):
-                self.logger().info("PYCOQC - Creating PycoQC json report for {}. ".format(self.run_id))
-                self.logger().info("PYCOQC - version {}".format(self.app_dictionary["pycoqc"]))
+        if os.path.isfile(sequencing_summary_file):
+            if not os.path.isfile(pycoqc_outfile):
+                logger(self.logfile).info("PYCOQC - Creating PycoQC json report for {}. ".format(run_barcode))
+                logger(self.logfile).info("PYCOQC - version {}".format(self.app_dictionary["pycoqc"]))
                 pycoqc_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} pycoQC -f {} --json_outfile " \
-                                 "{}/{}_pycoQC_output.json".format(self.app_dictionary["pycoqc"], file,
-                                                                          self.qc_dir, self.run_id)
-                self.run_command(pycoqc_command, "PYCOQC")
+                                 "{}".format(self.app_dictionary["pycoqc"],
+                                             sequencing_summary_file, pycoqc_outfile)
+                run_command(self.logfile, pycoqc_command, "PYCOQC")
+            else:
+                logger(self.logfile).info("PYCOQC - Directory not empty - pycoQC "
+                                          "already run for {}".format(run_barcode))
         else:
-            self.logger().info("PYCOQC - Directory not empty - pycoQC already run for {}".format(self.run_id))
+            logger(self.logfile).info("PYCOQC - Summary file for {} could not be found. ".format(run_barcode))
 
 
     def split_barcodes(self):
         """
-        Split barcodes
+        Split barcodes. Using guppy barcoding file. Checks if barcodes already split, if not calls split_barcodes()
+        function.
         """
-        if not glob.glob("{}/sequencing_summary_*".format(self.qc_dir)):
+        if not glob.glob("{}/sequencing_summary_*".format(self.split_barcodes_dir)):
 
             for file in glob.glob("{}/sequencing_summary_*".format(self.runfolder)):
-                self.logger().info("PYCOQC BARCODE SPLIT: Splitting summary sequencing file {} "
+                logger(self.logfile).info("PYCOQC BARCODE SPLIT: Splitting summary sequencing file {} "
                                    "according to barcodes".format(file))
-                self.logger().info("PYCOQC - version {}".format(self.app_dictionary["pycoqc"]))
+                logger(self.logfile).info("PYCOQC - version {}".format(self.app_dictionary["pycoqc"]))
                 split_barcode_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} Barcode_split " \
                                         "--output_unclassified --min_barcode_percent 0.0 --summary_file {} " \
-                                        "--output_dir {}".format(self.app_dictionary["pycoqc"], file, self.qc_dir)
-                self.run_command(split_barcode_command, "PYCOQC BARCODE SPLIT")
+                                        "--output_dir {}".format(self.app_dictionary["pycoqc"], file,
+                                                                 self.split_barcodes_dir)
+                run_command(self.logfile, split_barcode_command, "PYCOQC BARCODE SPLIT")
+
         else:
-            self.logger().warning("PYCOQC BARCODE SPLIT: Summary "
+            logger(self.logfile).warning("PYCOQC BARCODE SPLIT: Summary "
                                   "sequencing file already split for {} ".format(self.run_id))
 
 
-    def fastqc(self, fastq, run_barcode):
+    def fastqc(self, fastq, run_barcode, barcode):
         """
         FastQC analysis per barcode
         """
-        fastqc_output = run_barcode + "_fastqc.html"
         # if output file already present, do not re-analyse
-        if os.path.isfile("{}/{}".format(self.qc_dir, fastqc_output)):
-            self.logger().warning("FASTQC: Output for {} already exists".format(run_barcode))
+        if glob.glob("{}/*{}*.html".format(self.qc_dir, barcode)):
+            logger(self.logfile).warning("FASTQC: Output for {} already exists".format(run_barcode))
         else:
-            self.logger().info("FASTQC: Creating FastQC file for {}".format(run_barcode))
-            self.logger().info("FASTQC - version {}".format(self.app_dictionary["fastqc"]))
+            logger(self.logfile).info("FASTQC: Creating FastQC file for {}".format(run_barcode))
+            logger(self.logfile).info("FASTQC - version {}".format(self.app_dictionary["fastqc"]))
             fastqc_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} " \
                              "fastqc {} -o {}".format(self.app_dictionary["fastqc"], fastq, self.qc_dir)
-            self.run_command(fastqc_command, "FASTQC")
+            run_command(self.logfile, fastqc_command, "FASTQC")
 
 
     def human_read_removal(self, fastq, run_barcode):
         """
-        Removes human reads from the samples by alignment to the human reference genome.
+        Removes human reads from the samples by alignment to the human reference genome, with output in sam format.
+        Converts the sam output to
+        Runs samtools stats on the alignment output to show how many reads mapped to the human genome.
         """
         hr_rem_outpath = "{}/{}".format(self.hr_rem_dir, run_barcode)
         unmapped_fastq = "{}_unmapped.fastq".format(hr_rem_outpath)
         sam_output = "{}_aligned.sam".format(hr_rem_outpath)
         samtools_stats_file = "{}/{}_samtools_stats.txt".format(self.qc_dir, run_barcode)
 
+        # align reads to human reference genome using ont-specific parameters
+        # -a generates the outputs in the SAM format which allows extraction of unmapped reads
+        # -x -map-ont aligns long noisy reads of ~10% error rate to reference genome
+
         if os.path.isfile(sam_output):
-            self.logger().warning("HR REMOVAL: Already complete for {}".format(run_barcode))
+            logger(self.logfile).warning("HR REMOVAL: Already complete for {}".format(run_barcode))
         else:
-            # align reads to human reference genome using ont-specific parameters
-            self.logger().info("HR REMOVAL: Aligning reads to human reference genome for {}".format(fastq))
-            self.logger().info("MINIMAP2 - version {}".format(self.app_dictionary["minimap2"]))
-            minimap2_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} minimap2 -ax " \
+            logger(self.logfile).info("HR REMOVAL: Aligning reads to human reference genome for {}".format(fastq))
+            logger(self.logfile).info("MINIMAP2 - version {}".format(self.app_dictionary["minimap2"]))
+
+            minimap2_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} minimap2 -ax " \
                                "map-ont {} {} -o {}".format(self.app_dictionary["minimap2"],
                                                             self.reference_genome, fastq, sam_output)
-            self.run_command(minimap2_command, "MINIMAP2")
+            run_command(self.logfile, minimap2_command, "MINIMAP2")
 
+        # Perform samtools stats on the alignment output to calculate alignment stats
+        # (eg. no. reads mapped to human genome)
         if os.path.isfile(samtools_stats_file):
-            self.logger().warning("HR REMOVAL: Already complete for {}".format(run_barcode))
+            logger(self.logfile).warning("SAMTOOLS STATS: Samtools stats already conducted for {}".format(run_barcode))
         else:
-            # convert unassigned (non-human) reads from sam file to fastq file
-            self.logger().info("SAMTOOLS FASTQ: Convert non-human from sam "
-                               "to fastq for {}_unmapped.sam".format(hr_rem_outpath))
-            self.logger().info("SAMTOOLS - version {}".format(self.app_dictionary["samtools"]))
-            samtools_fastq_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} " \
+            logger(self.logfile).info("SAMTOOLS STATS: Run samtools stats for {}".format(run_barcode))
+            logger(self.logfile).info("SAMTOOLS - version {}".format(self.app_dictionary["samtools"]))
+
+            samtools_stats_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} samtools stats " \
+                                     "{} > {}".format(self.app_dictionary["samtools"], sam_output, samtools_stats_file)
+            run_command(self.logfile, samtools_stats_command, "SAMTOOLS STATS")
+
+        # Convert sam file to fastq file using samtools, outputting only unmapped reads (non-human)
+        # -f 4 = only outputs unmapped segments (with bitwise flag integer = 4)
+        if os.path.isfile(unmapped_fastq):
+            logger(self.logfile).warning("HR REMOVAL: Already complete for {}".format(run_barcode))
+        else:
+            logger(self.logfile).info("SAMTOOLS FASTQ: Convert non-human from sam "
+                                      "to fastq for {}_unmapped.sam".format(hr_rem_outpath))
+            logger(self.logfile).info("SAMTOOLS - version {}".format(self.app_dictionary["samtools"]))
+            samtools_fastq_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} " \
                                      "samtools fastq -f 4 {} -0 {}".format(self.app_dictionary["samtools"],
                                                                             sam_output, unmapped_fastq)
-            self.run_command(samtools_fastq_command, "SAMTOOLS FASTQ")
-
-        if os.path.isfile(samtools_stats_file):
-            self.logger().warning("SAMTOOLS STATS: Samtools stats already conducted for {}".format(run_barcode))
-                # remove intermediary file
-                # os.remove("{}_unmapped.bam".format(out_path))
-                # calculate % aligned reads to human reference genome
-        else:
-            self.logger().info("SAMTOOLS STATS: Run samtools stats for {}".format(run_barcode))
-            self.logger().info("SAMTOOLS - version {}".format(self.app_dictionary["samtools"]))
-            samtools_stats_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} samtools stats " \
-                                     "{} | grep ^SN | cut -f 2- > {}".format(self.app_dictionary["samtools"],
-                                                                             sam_output, samtools_stats_file)
-            self.run_command(samtools_stats_command, "SAMTOOLS STATS")
+            run_command(self.logfile, samtools_fastq_command, "SAMTOOLS FASTQ")
 
         return unmapped_fastq
 
 
-    # def concatenate_input_sequences(self):
-    #     """
-    #     Concatenate input sequences into one fna file
-    #     """
-    #     if os.path.isfile("{}/input-sequences.fna".format(self.index_dir)):
-    #         print("Library already concatenated")
-    #     else:
-    #         print("Concatenating library...")
-    #         index = "cat library/*/*.fna > input-sequences.fna"
-    #         subprocess.run(index, shell=True)
+    def concatenate_sequences(self, filepath_list, run_barcode):
+        """
+        Concatenate input sequences into one fna file
+        """
+        passing_contigs_fq = "{}/{}_passing_assembly.fasta".format(self.passing_contigs_dir, run_barcode)
+
+        if filepath_list:
+            if os.path.exists(passing_contigs_fq):
+                logger(self.logfile).warning("CONCATENATE SEQUENCES: Passing sequencings already "
+                                                  "concatenated for {}".format(run_barcode))
+            else:
+                logger(self.logfile).info("CONCATENATE SEQUENCES: Concatenating passing "
+                                               "sequences for {}".format(run_barcode))
+                assembly_string = ""
+                for filepath in filepath_list:
+                    assembly_string = "{} {}".format(assembly_string, filepath)
+
+                concat_command = "cat {} > {}".format(assembly_string, passing_contigs_fq)
+                run_command(self.logfile, concat_command, "CONCATENATE SEQUENCES")
+        else:
+            logger(self.logfile).warning("CONCATENATE SEQUENCES: No passing sequences found for {}".format(run_barcode))
+
+        return passing_contigs_fq
 
 
     def classification(self, run_barcode, unmapped_fastq):
@@ -283,46 +316,43 @@ class Pipeline:
 
         # Create centrifuge index summary
         if os.path.isfile(self.centrifuge_index_summary):
-            self.logger().warning("CENTRIFUGE: Centrifuge index summary file already created")
+            logger(self.logfile).warning("CENTRIFUGE: Centrifuge index summary file already created")
         else:
-            self.logger().info("CENTRIFUGE: Creating centrifuge index summary file for {}".format(run_barcode))
-            self.logger().info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
+            logger(self.logfile).info("CENTRIFUGE: Creating centrifuge index summary file for {}".format(run_barcode))
+            logger(self.logfile).info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
             # run centrifuge-inspect to output a summary of the index used for classification
-            centrifuge_inspect = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} centrifuge-inspect -s " \
+            centrifuge_inspect = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} centrifuge-inspect -s " \
                                  "{} > {}".format(self.app_dictionary["centrifuge"], self.index,
                                                   self.centrifuge_index_summary)
-            self.run_command(centrifuge_inspect, "CENTRIFUGE")
+            run_command(self.logfile, centrifuge_inspect, "CENTRIFUGE")
 
         # Run centrifuge classification
         if os.path.isfile(centrifuge_results) and os.path.isfile(centrifuge_summary):
-            self.logger().warning("CENTRIFUGE: Centrifuge already run for {}".format(run_barcode))
+            logger(self.logfile).warning("CENTRIFUGE: Centrifuge already run for {}".format(run_barcode))
         else:
             # classify reads
-            self.logger().info("CENTRIFUGE: Running centrifuge classification for {}".format(run_barcode))
-            self.logger().info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
+            logger(self.logfile).info("CENTRIFUGE: Running centrifuge classification for {}".format(run_barcode))
+            logger(self.logfile).info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
             # -S is file to write classification results to, --report-file is file to write classification summary to,
             # -x is the index, -f is the input sequence, --env sets centriuge indexes environment variable so it knows
             # where to look for the index
-            centrifuge_command = "docker run --env CENTRIFUGE_INDEXES={} --rm -v `pwd`:`pwd` -w `pwd` -it {} " \
+            centrifuge_command = "docker run --env CENTRIFUGE_INDEXES={} --rm -v `pwd`:`pwd` -w `pwd` {} " \
                                  "centrifuge -x p_compressed+h+v -q {} -S {} " \
                                  "--report-file {}".format(self.index_dir, self.app_dictionary['centrifuge'],
                                                            unmapped_fastq, centrifuge_results, centrifuge_summary)
-            self.run_command(centrifuge_command, "CENTRIFUGE")
+            run_command(self.logfile, centrifuge_command, "CENTRIFUGE")
 
+        # Convert centrifuge report to a kreport (kraken-style report). This format is picked up by MultiQC, and can
+        # be loaded into Pavian
         if os.path.isfile(centrifuge_kreport):
-            self.logger().warning("CENTRIFUGE: Centrifuge-kreport already generated for {}".format(run_barcode))
+            logger(self.logfile).warning("CENTRIFUGE: Centrifuge-kreport already generated for {}".format(run_barcode))
         else:
-            self.logger().info("CENTRIFUGE: Generating centrifuge-kreport for {}".format(run_barcode))
-            self.logger().info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
-            kreport_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} centrifuge-kreport -x {}" \
+            logger(self.logfile).info("CENTRIFUGE: Generating centrifuge-kreport for {}".format(run_barcode))
+            logger(self.logfile).info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
+            kreport_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} centrifuge-kreport -x {}" \
                               " {} > {}".format(self.app_dictionary["centrifuge"], self.index,
                                                 centrifuge_results, centrifuge_kreport)
-            self.run_command(kreport_command, "CENTRIFUGE")
-
-    def classification_proc_out(self):
-        """
-        Write function to parse fasta files and extract only those sequences that were classified to a new file
-        """
+            run_command(self.logfile, kreport_command, "CENTRIFUGE")
 
 
     def de_novo_assembly(self, run_barcode, unmapped_fastq):
@@ -342,24 +372,25 @@ class Pipeline:
         assembly_log = "{}/flye.log".format(assembly_outdir)
 
         if os.path.isfile(assembly_log):
-            self.logger().warning("FLYE: De novo assembly already complete for {}".format(run_barcode))
+            logger(self.logfile).warning("FLYE: De novo assembly already complete for {}".format(run_barcode))
         else:
-            self.logger().info("FLYE: Performing FLYE de novo assembly for {}".format(unmapped_fastq))
-            self.logger().info("FLYE - version {}".format(self.app_dictionary["flye"]))
+            logger(self.logfile).info("FLYE: Performing FLYE de novo assembly for {}".format(unmapped_fastq))
+            logger(self.logfile).info("FLYE - version {}".format(self.app_dictionary["flye"]))
             self.create_directory(assembly_outdir)
-            flye_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -it {} flye --nano-raw {} --out-dir {} " \
+            flye_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} flye --nano-raw {} --out-dir {} " \
                            "--meta".format(self.app_dictionary["flye"], unmapped_fastq, assembly_outdir)
 
             # rename output to add in run ID and barcode
-            self.run_command(flye_command, "FLYE")
+            run_command(self.logfile, flye_command, "FLYE")
 
             if os.path.exists(assembly_outfile):
                 try:
                     os.rename(assembly_outfile, assembly_outfile_renamed)
                 except:
-                    self.logger().error("FLYE: Assembly outfile {} could not be renamed".format(assembly_outfile))
+                    logger(self.logfile).error("FLYE: Assembly outfile {} could "
+                                               "not be renamed".format(assembly_outfile))
             else:
-                self.logger().warning("FLYE: No assembly produced.")
+                logger(self.logfile).warning("FLYE: No assembly produced.")
 
         return assembly_outfile_renamed, assembly_outdir
 
@@ -370,74 +401,60 @@ class Pipeline:
         ADD FUNCTIONALITY TO ONLY KEEP CONTIGS THAT HAVE COVERAGE OVER
         """
         if os.listdir(self.assembly_split_dir):
-            self.logger().warning("FAIDX: Assembly output already processed for {}".format(run_barcode))
+            logger(self.logfile).warning("FAIDX: Assembly output already processed for {}".format(run_barcode))
 
         else:
             if os.path.exists(assembly):
-                self.logger().info("FAIDX: Processing assembly output for {}".format(run_barcode))
-                self.logger().info("PYFAIDX - version {}".format(self.app_dictionary["pyfaidx"]))
-                faidx_command = "docker run -v `pwd`:`pwd` -v {}:{} {} /bin/sh -c 'cd {} ;" \
-                                " faidx -x {}'".format(assembly_outdir, assembly_outdir, self.app_dictionary["pyfaidx"],
+                logger(self.logfile).info("FAIDX: Processing assembly output for {}".format(run_barcode))
+                logger(self.logfile).info("PYFAIDX - version {}".format(self.app_dictionary["pyfaidx"]))
+                faidx_command = "docker run -v `pwd`:`pwd` -v {}:{} {} /bin/sh -c 'cd {} ; " \
+                                "faidx -x {}'".format(assembly_outdir, assembly_outdir, self.app_dictionary["pyfaidx"],
                                                       self.assembly_split_dir, assembly)
-                self.run_command(faidx_command, "FAIDX")
-            else:
-                self.logger().info("FAIDX: Assembly file not present for {}".format(run_barcode))
 
-        # create dictionary to store contig names and file paths
-        assembly_dict = {}
+                run_command(self.logfile, faidx_command, "FAIDX")
+            else:
+                logger(self.logfile).info("FAIDX: Assembly file not present for {}".format(run_barcode))
+
+        # create dictionary to store only filepaths of contigs that surpass the coverage threshold of 60X
+        assembly_list = []
 
         for file in os.listdir(self.assembly_split_dir):
-            contig = file.split(".fasta")[0].rstrip("\n")
             filepath = "{}/{}".format(self.assembly_split_dir, file)
-            assembly_dict[contig] = filepath
+            if any(contig in file for contig in passing_contigs):
+                assembly_list.append(filepath)
 
-        # remove contigs not present in passing_contigs list (required to surpass coverage threshold of 60X)
-        assembly_dict = self.remove_contigs(assembly_dict, passing_contigs)
-
-        return assembly_dict
+        return assembly_list
 
 
-    @staticmethod
-    def remove_contigs(assembly_dict, passing_contigs):
+    def rename_headers(self, run_barcode, passing_contigs_fq):
         """
-        Remove contigs from assembly dictionary that are not in the list of contigs that surpass the coverage threshold
-        of 60X
+        Add run and barcode name into the read headers in fasta files
         """
-        to_delete = []
-        for item in assembly_dict:
-            if item not in passing_contigs:
-                to_delete.append(item)
-        for item in to_delete:
-            del assembly_dict[item]
-        return assembly_dict
+        newfasta = "{}_headers_renamed.fasta".format(passing_contigs_fq.split(".fasta")[0])
+        if os.path.isfile(passing_contigs_fq):
+            if os.path.isfile(newfasta):
+                logger(self.logfile).warning("RENAME HEADERS: Headers already renamed for {}".format(run_barcode))
 
+            else:
+                logger(self.logfile).warning("RENAME HEADERS: Renaming headers for {}".format(run_barcode))
 
-    def mlst(self, run_barcode, assembly):
-        """
-        Multi-locus sequence typing using MLSTcheck.
-        Databases are bundled with the container so this doesn't require a separate download.
-        """
-        # assembly_string = ""
-        # for item in assembly_dict:
-        #     assembly_string = assembly_string.join(' ' + assembly_dict[item])
-        # print(assembly_string)
-        # #assembly_string = ' '.join(assembly_dict)
+                fasta = open(passing_contigs_fq, "r")
+                newfasta = open(newfasta, "w")
 
-        mlst_output = "{}/{}_mlst.json".format(self.mlst_dir, run_barcode)
-        #assembly_files = "{}/*".format(self.assembly_split_dir)
-        if os.path.exists(mlst_output):
-            self.logger().warning("MLST: mlst already complete for {}".format(run_barcode))
+                for line in fasta.readlines():
+                    if line.startswith(">"):
+                        elements = line.split(">")
+                        new_header = ">{}{}_{}".format(elements[0], run_barcode, elements[1])
+                        newfasta.write(new_header)
+                    else:
+                        newfasta.write(line)
+                fasta.close()
+                newfasta.close()
         else:
-            self.logger().info("MLST: Conducting MLST for {}".format(run_barcode))
-            self.logger().info("MLST - version {}".format(self.app_dictionary["mlst"]))
+            logger(self.logfile).warning("RENAME HEADERS: No passing sequences found for {}".format(run_barcode))
 
-            mlst_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` " \
-                            "-it {} mlst -q --json {} {}".format(self.app_dictionary["mlst"], mlst_output,
-                                                                 assembly)
-            # mlst_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` " \
-            #                 "-it {} mlst -q --json {} {}".format(self.app_dictionary["mlst"], mlst_output,
-            #                                                      assembly_files)
-            self.run_command(mlst_command, "MLST")
+
+        return newfasta
 
 
     def variant_calling(self):
@@ -452,16 +469,6 @@ class Pipeline:
         print("--------------------------")
 
 
-    def genetic_distance(self):
-        """
-        Calculate SNP distances
-        """
-        print("--------------------------\nGENETIC DISTANCE CALCULATION\n--------------------------")
-        # SNP-dists to calculate SNP distances
-        genetic_distance_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} snp-dists {} > " \
-                                   "{}".format(self.app_dictionary["snp-dists"], INPUT_FILENAME, OUTPUT_FILENAME.tsv)
-        run(genetic_distance_command, shell=True)
-        print("--------------------------")
 
 
     def report_generation(self):
@@ -470,49 +477,15 @@ class Pipeline:
         """
 
 
-    def multiqc(self, run_barcode):
-        """
-        Create MultiQC report, pulling in outputs from other tools
-        """
-        print("--------------------------\nMULTIQC\n--------------------------")
-        if os.path.exists("{}/multiqc_report.html".format(self.multiqc_dir)):
-            self.logger().warning("MULTIQC: Report already generated for {}".format(run_barcode))
-        else:
-            self.logger().info("MULTIQC: Creating MultiQC report for {}".format(run_barcode))
-            multiqc_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} multiqc {} --outdir " \
-                              "{}".format(self.app_dictionary["multiqc"], self.qc_dir, self.multiqc_dir)
-            self.run_command(multiqc_command, "MULTIQC")
-        print("--------------------------")
-
-
-    def logger(self):
-        """Write log messages to logfile.
-        Arguments:
-        message (str)
-            Details about the logged event.
-        tool (str)
-            Tool name. Used to search within the insight ops website.
-        """
-
-        logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                            datefmt='%H:%M:%S',
-                            level=logging.DEBUG,
-                            handlers=[
-                                logging.FileHandler(self.logfile),
-                                logging.StreamHandler(sys.stdout)]
-                            )
-        return logging
-
-
     def create_directory(self, directory):
         """
         Create output directories
         """
         if os.path.exists(directory):
-            self.logger().warning("Directory not created - already exists: {}".format(directory))
+            logger(self.logfile).warning("Directory not created - already exists: {}".format(directory))
         else:
             os.mkdir(directory)
-            self.logger().info("Output directory created: {}".format(directory))
+            logger(self.logfile).info("Output directory created: {}".format(directory))
         return directory
 
 
@@ -525,40 +498,14 @@ class Pipeline:
                                   "-p {} && tar xzvf {}/p_compressed+h+v.tar.gz -C {}".format(self.index_dir,
                                                                                               self.index_dir,
                                                                                               self.index_dir)
-            self.run_command(centrifuge_download, "CENTRIFUGE INDEX")
-
-
-    def run_command(self, command, tool):
-        """"
-        Run the command as a subprocess using Popen, write the stdout and stderr to file using logging, and write to
-        log dependent on exitcode
-        """
-        # mlst and centrifuge-kreport need to separate stdout and stderr
-        process = Popen(command, stdout=PIPE, stderr=STDOUT, shell=True)
-
-        # per-line write to logfile
-        for line in process.stdout:
-            # decode and strip any leading/trailing whitespace
-            line = line.decode("utf-8").strip()
-            # remove control characters from string
-            line = re.compile(r'[\n\r\t]').sub(' ', line)
-            self.logger().info('got line from subprocess: {}'.format(line))
-
-        exitcode = process.wait()
-
-        success_message = "{}: Commmand completed successfully without any errors.".format(tool)
-        failure_message = "{}: Job failed. See above subprocess output for details.".format(tool)
-        if exitcode == 0:
-            self.logger().info(success_message)
-        else:
-            self.logger().error(failure_message)
+            run_command(self.logfile, centrifuge_download, "CENTRIFUGE INDEX")
 
     #
     # def log_subprocess_output(self, out, err):
     #     for line in iter(out.readline, b''): # b'\n'-separated lines
     #
     #     for line in iter(err.readline, b''): # b'\n'-separated lines
-    #         self.logger().error('got line from subprocess: %r', line)
+    #         logger(self.logfile).error('got line from subprocess: %r', line)
 
 def arg_parse():
     """
@@ -577,33 +524,188 @@ def arg_parse():
 
     return vars(parser.parse_args())
 
-    # TEST
-    # python3 pipeline.py
-    # -d /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/test_run_folders
-    # -r /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/reference_sequences
-    # -i /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/centrifuge_index
-    # -o /media/data2/share/outbreak_pipeline/rduffin/msc_project/test_output
-    # -g /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna
-
-    # LIVE
-    # python3 pipeline.py
-    # -d /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/run_folders
-    # -r /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/reference_sequences
-    # -i /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/centrifuge_index
-    # -o /media/data2/share/outbreak_pipeline/rduffin/msc_project/output
-    # -g /media/data2/share/outbreak_pipeline/rduffin/msc_project/data/human_genome/ncbi/GCF_000001405.39_GRCh38.p13_genomic.fna
 
 def file_path(path):
+    """
+    Checks the command line argument provided is an existing filepath.
+    """
     if os.path.isfile(path):
         return path
     else:
         raise argparse.ArgumentTypeError(f"readable_file:{path} is not a valid filepath")
 
+
 def dir_path(path):
+    """
+    Checks the command line argument provided is an existing directory.
+    """
     if os.path.isdir(path):
         return path
     else:
         raise argparse.ArgumentTypeError(f"readable_dir:{path} is not a valid path")
+
+
+def logger(logfile):
+    """Write log messages to logfile.
+    Arguments:
+    message (str)
+        Details about the logged event.
+    tool (str)
+        Tool name. Used to search within the insight ops website.
+    """
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
+
+    logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
+                        datefmt='%H:%M:%S',
+                        level=logging.DEBUG,
+                        handlers=[
+                            logging.FileHandler(logfile),
+                            logging.StreamHandler(sys.stdout)]
+                        )
+    return logging
+
+
+def mlst(out_dir, assembly_files, logfile):
+    """
+    Multi-locus sequence typing using mlst (tseemann/mlst).
+    Databases are bundled with the container so this doesn't require a separate download.
+    """
+    mlst_output = "{}/mlst.tsv".format(out_dir)
+    mlst_scheme_list = "{}/mlst_schemes.txt".format(out_dir)
+
+    if os.path.exists(mlst_output):
+        logger(logfile).warning("MLST: mlst already complete (across all runs)")
+    else:
+        # Record pubmlst schemes
+        logger(logfile).info("MLST - recording supported PubMLST schemes in file")
+
+        schemes_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} mlst " \
+                          "--longlist > {}".format(app_dictionary["mlst"], mlst_scheme_list)
+
+        run_command(logfile, schemes_command, "MLST")
+
+        # Run mlst across all runs
+        logger(logfile).info("MLST: Conducting MLST across all runs")
+        logger(logfile).info("MLST - version {}".format(app_dictionary["mlst"]))
+
+        mlst_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {}" \
+                       " mlst {} > {}".format(app_dictionary["mlst"], assembly_files, mlst_output)
+
+        run_command(logfile, mlst_command, "MLST")
+
+
+def multiqc(out_dir, logfile):
+    """
+    Create MultiQC report, pulling in outputs from other tools
+    """
+    if os.path.exists("{}/multiqc_report.html".format(out_dir)):
+        logger(logfile).warning("MULTIQC: Report already generated")
+    else:
+        logger(logfile).info("MULTIQC: Creating MultiQC report")
+        multiqc_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} multiqc {} --outdir " \
+                          "{}".format(app_dictionary["multiqc"], out_dir, out_dir)
+        run_command(logfile, multiqc_command, "MULTIQC")
+
+
+def run_command(logfile, command, tool):
+    """"
+    Run the command as a subprocess using Popen, write the stdout and stderr to file using logging, and write to
+    log dependent on exitcode
+    """
+    process = Popen(command, stdout=PIPE, stderr=PIPE, shell=True)
+
+    stdout, stderr = process.communicate()
+    exitcode = process.wait()
+
+    success_message = "{}: Command completed successfully without any errors.".format(tool)
+    failure_message = "{}: Job failed. See above subprocess output for details.".format(tool)
+
+    if exitcode == 0:
+        logger(logfile).info(success_message)
+    else:
+        logger(logfile).error(failure_message)
+
+    for stream in [stdout, stderr]:
+        # decode and split by line
+        stream = stream.decode("utf-8")
+        lines = stream.split("\n")
+        for line in lines:
+        #     # remove control characters from string
+        #     line = re.compile(r'[\n\r\t]').sub(' ', line)
+            logger(logfile).info('got line from subprocess: {}'.format(line))
+
+
+def multi_fasta_alignment(out_dir, assembly_files, analysis_logfile):
+    """
+    Create multi-fasta alignment across all sequences using ??? minimap2
+    """
+    concatenated_assemblies = "{}/concatenated_assemblies.fasta".format(out_dir)
+
+    alignment_multifasta = "{}/multi_fasta_alignment.fastq".format(out_dir)
+
+    # concatenate contents of assembly files
+    if os.path.isfile(concatenated_assemblies):
+        logger(analysis_logfile).warning("CONCATENATE SEQUENCES: Already concatenated sequences across the analysis")
+
+    else:
+        logger(analysis_logfile).info("CONCATENATE SEQUENCES: Concatenating sequences "
+                                      "into a single fasta file across the analysis")
+        assembly_string = ""
+
+        for filepath in glob.glob(assembly_files):
+            assembly_string = "{} {}".format(assembly_string, filepath)
+
+        concat_command = "cat {} > {}".format(assembly_string, concatenated_assemblies)
+        run_command(analysis_logfile, concat_command, "CONCATENATE SEQUENCES")
+
+    # alignment_sam = "{}/multi_fasta_alignment.sam".format(out_dir)
+
+
+    # creating multi fasta alignment from all filtered alignment files
+    if os.path.isfile(alignment_sam):
+        logger(analysis_logfile).warning("MULTI FASTA ALIGNMENT: Already complete (across all runs)")
+    else:
+        logger(analysis_logfile).info("MULTI FASTA ALIGNMENT: Performing all-vs-all alignment across all runs")
+        logger(analysis_logfile).info("MINIMAP2 - version {}".format(app_dictionary["minimap2"]))
+
+        minimap2_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} minimap2 -ax " \
+                           "map-ont {} -o {}".format(app_dictionary["minimap2"], assembly_files, alignment_sam)
+
+        run_command(analysis_logfile, minimap2_command, "MINIMAP2")
+
+    # converting sam multi alignment file to fastq
+    if os.path.isfile(alignment_multifasta):
+        logger(analysis_logfile).warning("MULTI FASTA ALIGNMENT: Sam already converted to fastq")
+    else:
+        logger(analysis_logfile).info("MULTI FASTA ALIGNMENT: Converting sam all vs. all alignment to fastq")
+
+        samtools_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} samtools " \
+                           "bam2fq {} > {}".format(app_dictionary["samtools"], alignment_sam, alignment_multifasta)
+
+        run_command(analysis_logfile, samtools_command, "SAMTOOLS")
+
+
+def genetic_distance(out_dir, analysis_logfile):
+    """
+    Calculate SNP distances from a multi-fasta alignment file.
+    """
+    multi_alignment = "{}/multi_fasta_alignment.sam".format(out_dir)
+    snp_matrix = "{}/snp_matrix.tsv".format(out_dir)
+
+    if os.path.isfile(snp_matrix):
+        logger(analysis_logfile).warning("SNP DISTANCE CALCULATION: Already complete (across all runs)")
+    else:
+        logger(analysis_logfile).info("SNP DISTANCE CALCULATION: Performing snp distance "
+                                      "calculation on multi fasta alignment")
+        logger(analysis_logfile).info("SNP-DISTS - version {}".format(app_dictionary["snp-dists"]))
+
+    # GENETIC DISTANCE CALCULATION
+    # SNP-dists to calculate SNP distances
+    genetic_distance_cmd = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} snp-dists {} > " \
+                               "{}".format(app_dictionary["snp-dists"], multi_alignment, snp_matrix)
+
+    run_command(analysis_logfile, genetic_distance_cmd, "SNP-DISTS")
 
 
 def main():
@@ -618,25 +720,27 @@ def main():
     for key in app_dictionary:
         install_containers.install_tools(key, app_dictionary[key])
 
+
     for run in os.listdir(runfolder_dir):
         # run the pipeline per run in runfolders directory
         analysis = Pipeline(run, runfolder_dir, reference_dir, index_dir, out_dir, ref_gen)
         analysis.set_off_analysis()
 
+    # Conduct MLST across all runfolders in the analysis
+    analysis_logfile = "{}/analysis_logfile.txt".format(out_dir)
+    assembly_files = "{}/*/passing_contigs/*passing_assembly_headers_renamed.fasta".format(out_dir)
+
+    mlst(out_dir, assembly_files, analysis_logfile)
+
+    multi_fasta_alignment(out_dir, assembly_files, analysis_logfile)
+
+
+    genetic_distance(out_dir, analysis_logfile)
+
+    # Collect QC data for multiqc for a single MultiQC report for all samples in the analysis
+    qc_dirs = "{}/*/QC/".format(out_dir)
+    multiqc(out_dir, analysis_logfile)
+
+
 if __name__ == '__main__':
     main()
-
-#
-# def append_id(filename, uid):
-#     name, ext = os.path.splitext(filename)
-#     return "{uid}_{name}{ext}".format(name=name, uid=uid, ext=ext)
-
-#
-# def mapping_assembly():
-#     # start with minimap2
-#     pass
-#
-#
-# def consensus_generation():
-#     # bcftools consensus generation
-#     pass
