@@ -18,9 +18,13 @@ The pipeline contains the following steps:
 | Multi locus sequence typing (MLST)         | Use the DNA sequences of internal fragments of multiple housekeeping genes to characterise isolates of microbial species.                                                                          | mlst v2.19.0                                       |
  | Aggregate QC                               | Aggregates results for all samples in analysis, allowing comparison and scrutinisation of quality metrics and results.                                                                             | MultiQC v1.12                                      |
 
-Examples of the outputs from two analyses created by running this pipeline can be found in the pipeline_outputs 
+Examples of some of the outputs from two analyses created by running this pipeline can be found in the pipeline_outputs 
 directory, for a set of metagenomic samples and a set of monomicrobial samples. This includes the Krona reports 
-generated in downstream analyses.
+generated in downstream analyses. Just follow these links to view:
+* [Metagenomic MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_multiqc_report.html)
+* [Monomicrobial MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_multiqc_report.html)
+* [Metagenomic Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_taxonomy_krona.html)
+* [Monomicrobial Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_taxonomy_krona.html)
 
 All tools used in the pipelines are biocontainers pulled and run using Docker, with specific SHA tags for each viewable 
 in the config file (config.py)

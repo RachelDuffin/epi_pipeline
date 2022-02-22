@@ -260,6 +260,7 @@ class FastqAnalysis:
         hr_removal()                Convert sam to fastq (samtools), outputting only unmapped reads (non-human)
         classification()            Centrifuge classification. Create index summary file, run centrifuge
         create_kreport()            Convert centrifuge report to a kreport (kraken-style report)
+        create_krona_input()       Convert centrifuge results.tsv output file to a format that can be input to Krona
         de_novo_assembly()          De novo assembly with metaFlye
         assembly_split()            Split assembly output into a file per assembly using faidx
         get_passing_contigs()       Parse assembly info file to get a list of contigs that pass minimum coverage
@@ -300,6 +301,7 @@ class FastqAnalysis:
         self.centrifuge_kreport = "{}/{}_kreport.tsv".format(self.class_dir, self.run_barcode)
         self.centrifuge_results = "{}/{}_results.tsv".format(self.class_dir, self.run_barcode)
         self.centrifuge_summary = "{}/{}_summary.tsv".format(self.class_dir, self.run_barcode)
+        self.krona_input = "{}/{}_results_krona.tsv".format(self.class_dir, self.run_barcode)
         # human read removal
         self.hr_rem_dir = "{}/human_read_removal".format(self.runfolder_out)
         self.hr_rem_outpath = "{}/{}".format(self.hr_rem_dir, self.run_barcode)
@@ -342,6 +344,8 @@ class FastqAnalysis:
         self.classification()
         # convert classification output to centrifuge kreport
         self.create_kreport()
+        # parse results.tsv to create a file that can be input to Krona
+        self.create_krona_input()
 
         # ASSEMBLY
         self.de_novo_assembly()
@@ -532,6 +536,20 @@ class FastqAnalysis:
                               " {} > {}".format(app_dictionary["centrifuge"], self.index,
                                                 self.centrifuge_results, self.centrifuge_kreport)
             run_command(self.logfile, kreport_command, "CENTRIFUGE")
+
+
+    def create_krona_input(self):
+        """
+        Takes centrifuge results.tsv output file, and parses this to retain only the readID and taxID columns. This is
+        the input format required by Krona.
+        """
+        if os.path.exists(self.krona_input):
+            logger(self.logfile).warning("FILE PARSING: Krona input already created for {}".format(self.run_barcode))
+        else:
+            logger(self.logfile).info("FILE PARSING: Creating Krona input for {}".format(self.run_barcode))
+
+            fileparse_command = "cat {} | cut -f 1,3 > {}".format(self.centrifuge_results, self.krona_input)
+            run_command(self.logfile, fileparse_command, "FILE PARSING")
 
 
     def de_novo_assembly(self):
