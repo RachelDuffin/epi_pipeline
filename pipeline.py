@@ -154,7 +154,6 @@ class RunfolderAnalysis:
         # specify data inputs paths
         self.index_dir = index_dir
         self.reference_genome = ref_gen
-        self.app_dictionary = app_dictionary
         self.runfolder_dir = runfolder_dir
         self.run = run
         self.runfolder = "{}/{}".format(self.runfolder_dir, self.run)
@@ -201,7 +200,8 @@ class RunfolderAnalysis:
                 run_barcode = "{}_{}".format(self.run_id, barcode)
 
                 fastq_analysis = FastqAnalysis(fastq, self.runfolder, self.run_id, barcode, run_barcode, self.index_dir,
-                                               self.split_barcodes_dir, self.runfolder_out, self.logfile)
+                                               self.split_barcodes_dir, self.runfolder_out, self.logfile,
+                                               self.reference_genome)
                 fastq_analysis.set_off_analysis()
 
 
@@ -215,10 +215,10 @@ class RunfolderAnalysis:
             for file in glob.glob("{}/sequencing_summary_*".format(self.runfolder)):
                 logger(self.logfile).info("PYCOQC BARCODE SPLIT: Splitting summary sequencing file {} "
                                    "according to barcodes".format(file))
-                logger(self.logfile).info("PYCOQC - version {}".format(self.app_dictionary["pycoqc"]))
+                logger(self.logfile).info("PYCOQC - version {}".format(app_dictionary["pycoqc"]))
                 split_barcode_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} Barcode_split " \
                                         "--output_unclassified --min_barcode_percent 0.0 --summary_file {} " \
-                                        "--output_dir {}".format(self.app_dictionary["pycoqc"], file,
+                                        "--output_dir {}".format(app_dictionary["pycoqc"], file,
                                                                  self.split_barcodes_dir)
                 run_command(self.logfile, split_barcode_command, "PYCOQC BARCODE SPLIT")
 
@@ -269,7 +269,7 @@ class FastqAnalysis:
     """
 
     def __init__(self, fastq, runfolder, run_id, barcode, run_barcode, index_dir,
-                 split_barcodes_dir, runfolder_out, logfile):
+                 split_barcodes_dir, runfolder_out, logfile, reference_genome):
         """
         The constructor for FastqAnalysis class
         """
@@ -282,6 +282,7 @@ class FastqAnalysis:
         self.index_dir = index_dir
         self.index = "{}/p_compressed+h+v".format(self.index_dir)
         self.split_barcodes_dir = split_barcodes_dir
+        self.reference_genome = reference_genome
 
         # DATA OUTPUT PATHS
         self.logfile = logfile
@@ -363,9 +364,9 @@ class FastqAnalysis:
         if os.path.isfile(self.sequencing_summary_file):
             if not os.path.isfile(self.pycoqc_outfile):
                 logger(self.logfile).info("PYCOQC - Creating PycoQC json report for {}. ".format(self.run_barcode))
-                logger(self.logfile).info("PYCOQC - version {}".format(self.app_dictionary["pycoqc"]))
+                logger(self.logfile).info("PYCOQC - version {}".format(app_dictionary["pycoqc"]))
                 pycoqc_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} pycoQC -f {} --json_outfile " \
-                                 "{}".format(self.app_dictionary["pycoqc"],
+                                 "{}".format(app_dictionary["pycoqc"],
                                              self.sequencing_summary_file, self.pycoqc_outfile)
                 run_command(self.logfile, pycoqc_command, "PYCOQC")
             else:
@@ -391,9 +392,9 @@ class FastqAnalysis:
             logger(self.logfile).warning("FASTQC: Output for {} already exists".format(self.run_barcode))
         else:
             logger(self.logfile).info("FASTQC: Creating FastQC file for {}".format(self.run_barcode))
-            logger(self.logfile).info("FASTQC - version {}".format(self.app_dictionary["fastqc"]))
+            logger(self.logfile).info("FASTQC - version {}".format(app_dictionary["fastqc"]))
             fastqc_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} " \
-                             "fastqc {} -o {}".format(self.app_dictionary["fastqc"], fastq, self.qc_dir)
+                             "fastqc {} -o {}".format(app_dictionary["fastqc"], fastq, self.qc_dir)
             run_command(self.logfile, fastqc_command, "FASTQC")
 
         # rename outfile to ensure it matches the naming conventions of outputs (so it appears in correct place in
@@ -435,10 +436,10 @@ class FastqAnalysis:
         else:
             logger(self.logfile).info("MINIMAP2 HR MAPPING: Aligning reads to human "
                                       "reference genome for {}".format(self.fastq))
-            logger(self.logfile).info("MINIMAP2 - version {}".format(self.app_dictionary["minimap2"]))
+            logger(self.logfile).info("MINIMAP2 - version {}".format(app_dictionary["minimap2"]))
 
             minimap2_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} minimap2 -ax " \
-                               "map-ont {} {} -o {}".format(self.app_dictionary["minimap2"],
+                               "map-ont {} {} -o {}".format(app_dictionary["minimap2"],
                                                             self.reference_genome, self.fastq, self.sam_output)
             run_command(self.logfile, minimap2_command, "MINIMAP2")
 
@@ -454,10 +455,10 @@ class FastqAnalysis:
                                          "conducted for {}".format(self.run_barcode))
         else:
             logger(self.logfile).info("SAMTOOLS STATS: Run samtools stats for {}".format(self.run_barcode))
-            logger(self.logfile).info("SAMTOOLS - version {}".format(self.app_dictionary["samtools"]))
+            logger(self.logfile).info("SAMTOOLS - version {}".format(app_dictionary["samtools"]))
 
             samtools_stats_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` -i -t {} samtools stats " \
-                                     "{} > {}".format(self.app_dictionary["samtools"],
+                                     "{} > {}".format(app_dictionary["samtools"],
                                                       self.sam_output, self.samtools_stats_file)
             run_command(self.logfile, samtools_stats_command, "SAMTOOLS STATS")
 
@@ -472,9 +473,9 @@ class FastqAnalysis:
         else:
             logger(self.logfile).info("SAMTOOLS FASTQ: Convert non-human from sam "
                                       "to fastq for {}_unmapped.sam".format(self.hr_rem_outpath))
-            logger(self.logfile).info("SAMTOOLS - version {}".format(self.app_dictionary["samtools"]))
+            logger(self.logfile).info("SAMTOOLS - version {}".format(app_dictionary["samtools"]))
             samtools_fastq_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} " \
-                                     "samtools fastq -f 4 {} -0 {}".format(self.app_dictionary["samtools"],
+                                     "samtools fastq -f 4 {} -0 {}".format(app_dictionary["samtools"],
                                                                             self.sam_output, self.unmapped_fastq)
             run_command(self.logfile, samtools_fastq_command, "SAMTOOLS FASTQ")
 
@@ -491,10 +492,10 @@ class FastqAnalysis:
         else:
             logger(self.logfile).info("CENTRIFUGE: Creating centrifuge index "
                                       "summary file for {}".format(self.run_barcode))
-            logger(self.logfile).info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
+            logger(self.logfile).info("CENTRIFUGE - version {}".format(app_dictionary["centrifuge"]))
             # run centrifuge-inspect to output a summary of the index used for classification
             centrifuge_inspect = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} centrifuge-inspect -s " \
-                                 "{} > {}".format(self.app_dictionary["centrifuge"], self.index,
+                                 "{} > {}".format(app_dictionary["centrifuge"], self.index,
                                                   self.centrifuge_index_summary)
             run_command(self.logfile, centrifuge_inspect, "CENTRIFUGE")
 
@@ -504,13 +505,13 @@ class FastqAnalysis:
         else:
             # classify reads
             logger(self.logfile).info("CENTRIFUGE: Running centrifuge classification for {}".format(self.run_barcode))
-            logger(self.logfile).info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
+            logger(self.logfile).info("CENTRIFUGE - version {}".format(app_dictionary["centrifuge"]))
             # -S is file to write classification results to, --report-file is file to write classification summary to,
             # -x is the index, -f is the input sequence, --env sets centriuge indexes environment variable so it knows
             # where to look for the index
             centrifuge_command = "docker run --env CENTRIFUGE_INDEXES={} --rm -v `pwd`:`pwd` -w `pwd` {} " \
                                  "centrifuge -x p_compressed+h+v -q {} -S {} " \
-                                 "--report-file {}".format(self.index_dir, self.app_dictionary['centrifuge'],
+                                 "--report-file {}".format(self.index_dir, app_dictionary['centrifuge'],
                                                            self.unmapped_fastq, self.centrifuge_results,
                                                            self.centrifuge_summary)
             run_command(self.logfile, centrifuge_command, "CENTRIFUGE")
@@ -526,9 +527,9 @@ class FastqAnalysis:
                                          "generated for {}".format(self.run_barcode))
         else:
             logger(self.logfile).info("CENTRIFUGE: Generating centrifuge-kreport for {}".format(self.run_barcode))
-            logger(self.logfile).info("CENTRIFUGE - version {}".format(self.app_dictionary["centrifuge"]))
+            logger(self.logfile).info("CENTRIFUGE - version {}".format(app_dictionary["centrifuge"]))
             kreport_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} centrifuge-kreport -x {}" \
-                              " {} > {}".format(self.app_dictionary["centrifuge"], self.index,
+                              " {} > {}".format(app_dictionary["centrifuge"], self.index,
                                                 self.centrifuge_results, self.centrifuge_kreport)
             run_command(self.logfile, kreport_command, "CENTRIFUGE")
 
@@ -549,10 +550,10 @@ class FastqAnalysis:
             logger(self.logfile).warning("METAFLYE: De novo assembly already complete for {}".format(self.run_barcode))
         else:
             logger(self.logfile).info("METAFLYE: Performing METAFLYE de novo assembly for {}".format(self.unmapped_fastq))
-            logger(self.logfile).info("METAFLYE - version {}".format(self.app_dictionary["flye"]))
-            create_directory(assembly_outdir, self.logfile)
+            logger(self.logfile).info("METAFLYE - version {}".format(app_dictionary["flye"]))
+            create_directory(self.assembly_outdir, self.logfile)
             metaflye_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} flye --nano-raw {} --out-dir {} " \
-                               "--meta".format(self.app_dictionary["flye"], self.unmapped_fastq, self.assembly_outdir)
+                               "--meta".format(app_dictionary["flye"], self.unmapped_fastq, self.assembly_outdir)
 
             # rename output to add in run ID and barcode
             run_command(self.logfile, metaflye_command, "FLYE")
@@ -583,10 +584,10 @@ class FastqAnalysis:
         else:
             if os.path.exists(self.assembly_outfile):
                 logger(self.logfile).info("FAIDX: Processing assembly output for {}".format(self.run_barcode))
-                logger(self.logfile).info("PYFAIDX - version {}".format(self.app_dictionary["pyfaidx"]))
+                logger(self.logfile).info("PYFAIDX - version {}".format(app_dictionary["pyfaidx"]))
                 faidx_command = "docker run -v `pwd`:`pwd` -v {}:{} {} /bin/sh -c 'cd {} ; " \
                                 "faidx -x {}'".format(self.assembly_outdir, self.assembly_outdir,
-                                                      self.app_dictionary["pyfaidx"], self.assembly_split_dir,
+                                                      app_dictionary["pyfaidx"], self.assembly_split_dir,
                                                       self.assembly_outfile)
 
                 run_command(self.logfile, faidx_command, "FAIDX")
@@ -726,8 +727,8 @@ def logger(logfile):
     for handler in logging.root.handlers[:]:
         logging.root.removeHandler(handler)
 
-    logging.basicConfig(format='%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
-                        datefmt='%H:%M:%S',
+    logging.basicConfig(format='%(asctime)s %(msecs)d %(name)s %(levelname)s %(message)s',
+                        datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.DEBUG,
                         handlers=[
                             logging.FileHandler(logfile),
