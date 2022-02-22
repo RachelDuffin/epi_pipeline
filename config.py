@@ -1,17 +1,8 @@
 import os
 
-TEST =True
-
-base_dir = "{}/data".format(os.getcwd())
-
-if TEST:
-    runfolders = "{}/test_run_folders".format(base_dir)
-else:
-    runfolders = "{}/data/run_folders".format(base_dir)
-
 app_dictionary = {
     "fastqc": "quay.io/biocontainers/fastqc@sha256:319b8d4eca0fc0367d192941f221f7fcd29a6b96996c63cbf8931dbb66e53348",
-    "multiqc": "quay.io/biocontainers/multiqc@sha256:2c3362c12409ca8f06f182c35cf8a804ee23cf8a32dc02c952fa60bc6e48db96",
+    "multiqc": "quay.io/biocontainers/multiqc@sha256:82dae6463e1b19fafb6022401186300b66decf5ce319a725271700fe4e32e12a",
     "pycoqc": "quay.io/biocontainers/pycoqc@sha256:ea0a084751a0b48b5ffe90e9d3adfa8f57473709a1b0a95c9cb38d434ee3a9a2",
     "minimap2":
         "quay.io/biocontainers/minimap2@sha256:7f95eecc8eeee8ef8ae7e24d1d1a49ee056fb21d72aea4e2def97484f8a206c5",
@@ -19,19 +10,11 @@ app_dictionary = {
         "quay.io/biocontainers/samtools@sha256:2b911396b907769945a5446c8779d7be83f999bb4211733a8259040e67f4065f",
     "flye": "quay.io/biocontainers/flye@sha256:f895c72298ea3ae568c265cfb575fefeca768c42870cfea0ef3a4cfc35704086",
     "mlst": "quay.io/biocontainers/mlst@sha256:d8d8e731f165df398d95ad0969333aef45bcae678da11a26a1d2e76d44bc2698",
-    "snp-sites":
-        "quay.io/biocontainers/snp-sites@sha256:02c868581e36f97cc16f066f0ef4c2d169873ca4cf6932a104beb10c828a9c5c",
-    "snp-dists":
-        "quay.io/biocontainers/snp-dists@sha256:7ac5037a7967252593acee51b2ce2202b30a387d53bd62005fc3e927145557b4",
     "centrifuge":
         "quay.io/biocontainers/centrifuge@sha256:e3ce6d3d83a1df5327ee27b66d4c9eedb05b7bcd2eae8f78a7f7b9c1e8672c1c",
     "pyfaidx":
         "quay.io/biocontainers/pyfaidx@sha256:96bfff4ed96cb9149c54d21d6ea8d6d9eadcb4c0838b8e27df4b929cb5fe4e2f"
 }
-# "mlstcheck" :
-#         "quay.io/biocontainers/perl-bio-mlst-check@sha256:"
-#         "828f4a536603a39559118a279e9c66d71e83a155cf0ac824efdb9339ba59e201",
-
 
 refseq_dict = {
     "Acinetobacter_baumannii": "https://ftp.ncbi.nih.gov/genomes/refseq/bacteria/Acinetobacter_baumannii/representative"
