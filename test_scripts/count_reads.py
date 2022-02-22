@@ -1,7 +1,7 @@
 import subprocess
+import os
 
-file_dictionary = {"monoisolates": {"file_path": "/mnt/flavia/rduffin/outbreak_pipeline/test_data/input/"
-                                                 "enterococcus_faecium/enterococcus/",
+file_dictionary = {"monoisolates": {"file_path": "/input/enterococcus_faecium/enterococcus/",
                                     "files": ["ef1_bc_75/210612_EF_R1_barcode01.fq",
                                               "ef1_bc_75/210612_EF_R1_barcode02.fq",
                                               "ef1_bc_75/210612_EF_R1_barcode03.fq",
@@ -24,7 +24,7 @@ file_dictionary = {"monoisolates": {"file_path": "/mnt/flavia/rduffin/outbreak_p
                                               "ef2_bc_75/210612_EF_R2_barcode09.fq",
                                               "ef2_bc_75/210612_EF_R2_barcode10.fq"]
                                     },
-                   "metagenomics": {"file_path": "/mnt/flavia/rduffin/outbreak_pipeline/output/",
+                   "metagenomics": {"file_path": "/output/",
                                     "files": ["200408_CMG_RUN3_Pool3/human_read_removal/"
                                               "200408_CMG_RUN3_Pool3_barcode01_unmapped.fastq",
                                               "200416_CMG_RUN4_Pool6/human_read_removal/"
@@ -65,15 +65,29 @@ def count_reads(sample_type, fastq_list, file_path):
     """
     Calculate number of reads in each fastq file and output to file
     """
-    # overwrite old read count file
-    read_count = open("read_count_{}.txt".format(sample_type), 'w')
-    read_count.close()
+    print("COUNTING READS FOR SAMPLES: {}".format(sample_type))
     # get read count from all files in dictionary and print to output file
-    with open("read_count_{}.txt".format(sample_type), 'a') as filetowrite:
+    with open("read_count_{}.txt".format(sample_type), 'w') as filetowrite:
         for file in fastq_list:
-            stdout, stderr = subprocess.Popen("awk 'END {print NR/4}' " + file_path + file, shell=True,
-                                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
+            command = "awk 'END {print NR/4}' " + file_path + file
+            print(command)
+            stdout, stderr = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
+                                              stderr=subprocess.STDOUT).communicate()
             filetowrite.write(stdout.decode('ascii'))
+
+def calc_average_readno(sample_type):
+    """
+    Calculate average number of reads per sample for the sample type
+    """
+    print("CALCULATING AVERAGE READ COUNT FOR SAMPLES: {}".format(sample_type))
+
+    # get read count from all files in dictionary and print to output file
+    with open("average_reads_{}.txt".format(sample_type), 'w') as filetowrite:
+        command = "cat read_count_{}.txt".format(sample_type) + "| jq -s add/length | awk '{x+=$0}END{print x/NR}'"
+        print(command)
+        stdout, stderr = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
+                                            stderr=subprocess.STDOUT).communicate()
+        filetowrite.write(stdout.decode('ascii'))
     filetowrite.close()
 
 
@@ -81,24 +95,45 @@ def calculate_read_length(sample_type, fastq_list, file_path):
     """
     Calculate length of reads in each fastq file and output to file
     """
-    # overwrite old read length file
-    read_count = open("read_length_{}.txt".format(sample_type), 'w')
-    read_count.close()
+    print("CALCULATING READ LENGTHS FOR SAMPLES: {}".format(sample_type))
     # get max and min read length from all files in dictionary and print to output file
-    with open("read_length_{}.txt".format(sample_type), 'a') as filetowrite:
+    with open("read_length_{}.txt".format(sample_type), 'w') as filetowrite:
         for file in fastq_list:
-            stdout, stderr = subprocess.Popen("awk 'NR%4==2{print length($0)}' " + file_path + file, shell=True,
+            command = "awk 'NR%4==2{print length($0)}' " + file_path + file
+            print(command)
+            stdout, stderr = subprocess.Popen(command, shell=True,
                                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT).communicate()
             filetowrite.write(stdout.decode('ascii'))
         filetowrite.close()
 
 
+def calculate_length_summary(sample_type):
+    """
+    Output min, max, average and median read lengths and output to file.
+    """
+    print("GENERATING READ LENGTH SUMMARY FOR SAMPLES: {}".format(sample_type))
+
+    with open("summary_read_length_{}.txt".format(sample_type), 'w') as filetowrite:
+        command="cat read_length_" + sample_type + \
+                ".txt|jq -s '{minimum:min,maximum:max,average:(add/length)," \
+                "median:(sort|if length%2==1 then.[length/2|floor]else[.[length/2-1,length/2]]|add/2 end)," \
+                "stdev:((add/length)as$a|map(pow(.-$a;2))|add/length|sqrt)}'"
+        print(command)
+        stdout, stderr = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE,
+                                          stderr=subprocess.STDOUT).communicate()
+
+        filetowrite.write(stdout.decode('ascii'))
+        filetowrite.close()
+
 def main():
-    for key in file_dictionary:
-        count_reads(sample_type=key, fastq_list=file_dictionary[key]["files"],
-                    file_path=file_dictionary[key]["file_path"])
-        calculate_read_length(sample_type=key, fastq_list=file_dictionary[key]["files"],
-                              file_path=file_dictionary[key]["file_path"])
+    for sample_type in file_dictionary:
+        base_path = os.getcwd().rsplit('/', 2)[0]
+        file_path = base_path + file_dictionary[sample_type]["file_path"]
+        fastq_list = file_dictionary[sample_type]["files"]
+        calculate_read_length(sample_type, fastq_list, file_path)
+        calculate_length_summary(sample_type)
+        count_reads(sample_type, fastq_list, file_path)
+        calc_average_readno(sample_type)
 
 
 if __name__ == '__main__':
