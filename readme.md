@@ -122,3 +122,8 @@ Rosalind High Performance Cluster):
 | test_accuracy.py              | Compare assembly outputs with reference sequences to determine accuracy (command line input filepaths)                                                                                                                            |
 | generate_simulated_data.py    | Incomplete, written to generate simulated monomicrobial and metagenomic datasets from reference genomes for testing datasets using NanoSim                                                                                        |
 | count_reads.py                | Calculates number of reads and lengths of reads in fastq files and outputs the metrics to text files. This was written to calculate metrics to input into NanoSim commands. Takes input filepaths from a dictionary (hard-coded). |
+
+The summary image of all the results generated using the test_assemblers script for performance testing of Canu, 
+Raven and metaFlye is displayed below:
+
+![alt text](https://github.com/RachelDuffin/epi_pipeline/blob/master/assembly_results/Assembly_test_plots.png?raw=true)
