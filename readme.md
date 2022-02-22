@@ -23,8 +23,8 @@ directory, for a set of metagenomic samples and a set of monomicrobial samples. 
 generated in downstream analyses. Just follow these links to view:
 * [Metagenomic MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_multiqc_report.html)
 * [Monomicrobial MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_multiqc_report.html)
-* [Metagenomic Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_taxonomy_krona.html)
-* [Monomicrobial Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_taxonomy_krona.html)
+* [Metagenomic Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_taxonomy.krona.html)
+* [Monomicrobial Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_taxonomy.krona.html)
 
 All tools used in the pipelines are biocontainers pulled and run using Docker, with specific SHA tags for each viewable 
 in the config file (config.py)
