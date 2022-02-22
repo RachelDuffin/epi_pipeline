@@ -1,4 +1,4 @@
-# Outbreak Analysis Pipeline
+# Epidemiological Analysis Pipeline
 
 This pipeline (pipeline.py) was created as part of an MSc project. It was written to be run on unix-based systems.  
 
