@@ -307,6 +307,7 @@ class FastqAnalysis:
         self.hr_rem_outpath = "{}/{}".format(self.hr_rem_dir, self.run_barcode)
         self.sam_output = "{}_aligned.sam".format(self.hr_rem_outpath)
         self.unmapped_fastq = "{}_unmapped.fastq".format(self.hr_rem_outpath)
+        self.mapped_fastq = "{}_mapped.fastq".format(self.hr_rem_outpath)
         # samtools stats
         self.samtools_stats_file = "{}/{}_samtools_stats.txt".format(self.qc_dir, self.run_barcode)
         # metaflye de novo assembly
@@ -469,18 +470,34 @@ class FastqAnalysis:
 
     def hr_removal(self):
         """
-        Convert sam file to fastq file using samtools, outputting only unmapped reads (non-human)
+        Convert sam file to fastq file using samtools, outputting unmapped reads (non-human) to one file, and mapped
+        reads to another
         -f 4 = only outputs unmapped segments (with bitwise flag integer = 4)
+        -F 4 = only outputs mapped segements (skips reads with bitwise flag integer = 4)
         """
         if os.path.isfile(self.unmapped_fastq):
-            logger(self.logfile).warning("SAMTOOLS FASTQ: Already complete for {}".format(self.run_barcode))
+            logger(self.logfile).warning("SAMTOOLS FASTQ: Unmapped fastq already created "
+                                         "for {}".format(self.run_barcode))
         else:
             logger(self.logfile).info("SAMTOOLS FASTQ: Convert non-human from sam "
                                       "to fastq for {}_unmapped.sam".format(self.hr_rem_outpath))
             logger(self.logfile).info("SAMTOOLS - version {}".format(app_dictionary["samtools"]))
+            # -f -4 ensures only unmapped reads are output
             samtools_fastq_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} " \
                                      "samtools fastq -f 4 {} -0 {}".format(app_dictionary["samtools"],
                                                                             self.sam_output, self.unmapped_fastq)
+            run_command(self.logfile, samtools_fastq_command, "SAMTOOLS FASTQ")
+        if os.path.isfile(self.mapped_fastq):
+            logger(self.logfile).warning("SAMTOOLS FASTQ: Mapped fastq already created "
+                                         "for {}".format(self.run_barcode))
+        else:
+            logger(self.logfile).info("SAMTOOLS FASTQ: Convert human from sam "
+                                      "to fastq for {}_mapped.sam".format(self.hr_rem_outpath))
+            logger(self.logfile).info("SAMTOOLS - version {}".format(app_dictionary["samtools"]))
+            # -f -4 ensures only unmapped reads are output
+            samtools_fastq_command = "docker run --rm -v `pwd`:`pwd` -w `pwd` {} " \
+                                     "samtools fastq -F 4 {} -0 {}".format(app_dictionary["samtools"],
+                                                                           self.sam_output, self.mapped_fastq)
             run_command(self.logfile, samtools_fastq_command, "SAMTOOLS FASTQ")
 
 
