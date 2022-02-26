@@ -600,7 +600,7 @@ class FastqAnalysis:
                     logger(self.logfile).error("METAFLYE: Assembly outfile {} could "
                                                "not be renamed".format(assembly_outfile_old))
                 else:
-                    logger(self.logfile).error("METAFLYE: Assembly outfile {} successfully "
+                    logger(self.logfile).info("METAFLYE: Assembly outfile {} successfully "
                                                "renamed".format(assembly_outfile_old))
             else:
                 logger(self.logfile).warning("METAFLYE: No assembly produced.")
@@ -695,7 +695,7 @@ class FastqAnalysis:
                 logger(self.logfile).warning("RENAME HEADERS: Headers already renamed for {}".format(self.run_barcode))
 
             else:
-                logger(self.logfile).warning("RENAME HEADERS: Renaming headers for {}".format(self.run_barcode))
+                logger(self.logfile).info("RENAME HEADERS: Renaming headers for {}".format(self.run_barcode))
 
                 fasta = open(self.passing_contigs_fq, "r")
                 newfasta = open(self.headers_renamed_fq, "w")
