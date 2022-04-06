@@ -1,3 +1,12 @@
+"""
+count_reads: Script to calculate read statistics for a set of input fastq/fq files. N.B. filepaths have been hard coded
+             (monomicrobial dataset and metagenomics dataset).
+
+CALCULATIONS:
+    - No. reads per fastq, and average read count per sample type
+    - Length of reads in each fastq, and summary stats per sample type (min, max, average and median read lengths)
+"""
+
 import subprocess
 import os
 
@@ -81,7 +90,7 @@ def calc_average_readno(sample_type):
     """
     print("CALCULATING AVERAGE READ COUNT FOR SAMPLES: {}".format(sample_type))
 
-    # get read count from all files in dictionary and print to output file
+    # calculate average read count for the sample type
     with open("average_reads_{}.txt".format(sample_type), 'w') as filetowrite:
         command = "cat read_count_{}.txt".format(sample_type) + "| jq -s add/length | awk '{x+=$0}END{print x/NR}'"
         print(command)
@@ -96,7 +105,7 @@ def calculate_read_length(sample_type, fastq_list, file_path):
     Calculate length of reads in each fastq file and output to file
     """
     print("CALCULATING READ LENGTHS FOR SAMPLES: {}".format(sample_type))
-    # get max and min read length from all files in dictionary and print to output file
+    # get read lengths from all files in dictionary and print to output file
     with open("read_length_{}.txt".format(sample_type), 'w') as filetowrite:
         for file in fastq_list:
             command = "awk 'NR%4==2{print length($0)}' " + file_path + file
@@ -112,7 +121,7 @@ def calculate_length_summary(sample_type):
     Output min, max, average and median read lengths and output to file.
     """
     print("GENERATING READ LENGTH SUMMARY FOR SAMPLES: {}".format(sample_type))
-
+    # calculate min, max, average and median read lengths for all files in dictionary
     with open("summary_read_length_{}.txt".format(sample_type), 'w') as filetowrite:
         command="cat read_length_" + sample_type + \
                 ".txt|jq -s '{minimum:min,maximum:max,average:(add/length)," \

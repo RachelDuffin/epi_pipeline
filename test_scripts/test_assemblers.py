@@ -1,5 +1,6 @@
 """
-Script to compare performance, scalability and accuracy between assembly tools.
+test_assemblers: Script to compare performance and scalability between assembly tools. N.B. this script will only work
+                 in the Rosalind HPC environment. N.B. filepaths have been hard coded.
 
 Conduct comparison of metagenomic assemblers, using 5 E. faecium isolates (monomicrobial samples), and Zymo mock
 community data
@@ -17,12 +18,14 @@ import subprocess
 import os
 import sys
 
+
 assembler_dictionary = {
     "raven":
         "quay.io/biocontainers/raven-assembler@sha256:3bc4cc61483cc48243f6b416eaae41f24eb95f75b7a2770f8062c75b5ac53da3",
     "flye": "quay.io/biocontainers/flye@sha256:f895c72298ea3ae568c265cfb575fefeca768c42870cfea0ef3a4cfc35704086",
     "canu": "quay.io/biocontainers/canu@sha256:b48b52afc355477015ef60bebded3b4ab3d3099bbf5698879de8eb600c9ff1a4"
 }
+
 
 input_filepaths = {
     "/data/monomicrobial_samples/enterococcus_faecium/ef1_bc_75/210612_EF_R1_barcode01.fq":
@@ -39,6 +42,7 @@ input_filepaths = {
     "/data/monomicrobial_samples/Zymo-GridION-LOG-BB-SN.fq.gz": "/output/assemblers/mock_microbial_community/"
 }
 
+
 def singularity_pull(tool, image):
     """
     Pull singularity images as docker images
@@ -48,6 +52,7 @@ def singularity_pull(tool, image):
     process = subprocess.Popen(cmd, shell = True)
     process.wait()
     print("-----------------------")
+
 
 def run_assembly(input_filepath, sample_name, threads, assembler, base_path, out_dir):
     """
@@ -109,6 +114,7 @@ def run_assembly(input_filepath, sample_name, threads, assembler, base_path, out
         os.chdir(base_path)
     print("--------------------------")
 
+
 def get_command(input_filepath, sample_name, assembler, threads, base_path, out_dir):
     """
     Returns command to run/append to file
@@ -143,6 +149,7 @@ def get_command(input_filepath, sample_name, assembler, threads, base_path, out_
         return command_dictionary["canu_2_1"]
     else:
         return command_dictionary[assembler]
+
 
 def main():
     base_path = os.getcwd().rsplit('/', 2)[0]

@@ -1,6 +1,8 @@
 """
 Generates simulated monomicrobial and metagenomic datasets from a set of reference genome sequences in a reference
 sequence directory.
+
+N.B. This script was not used and is incomplete
 """
 
 import os
