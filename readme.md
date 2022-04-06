@@ -21,10 +21,11 @@ The pipeline contains the following steps:
 Examples of some of the outputs from two analyses created by running this pipeline can be found in the pipeline_outputs 
 directory, for a set of metagenomic samples and a set of monomicrobial samples. This includes the Krona reports 
 generated in downstream analyses. Just follow these links to view:
-* [Metagenomic MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_multiqc_report.html)
-* [Monomicrobial MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_multiqc_report.html)
-* [Metagenomic Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_taxonomy.krona.html)
-* [Monomicrobial Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_taxonomy.krona.html)
+
+| Dataset       | Krona Report (bacterial reads)                                                                                                                         | MultiQC Report                                                                                                                                          | Krona Report (human reads)                                                                                                                                                            |
+|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Monomicrobial | [Monomicrobial Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_taxonomy.krona.html)     | [Monomicrobial MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_multiqc_report.html)    | [Monomicrobial Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/monomicrobial_samples/monomicrobial_human_removed_reads_taxonomy.krona.html)               |
+| Metagenomic   | [Metagenomic Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_taxonomy.krona.html)  | [Metagenomic MultiQC Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_multiqc_report.html) | [Metagenomic Krona Report](https://rachelduffin.github.io/epi_pipeline/pipeline_outputs/clinical_metagenomic_samples/metagenomic_human_removed_reads_taxonomy.krona.html) |
 
 All tools used in the pipelines are biocontainers pulled and run using Docker, with specific SHA tags for each viewable 
 in the config file (config.py)
@@ -41,6 +42,7 @@ source venv/bin/activate
 ```
 pip3 -r install requirements.txt
 ```
+
 ## Required inputs, and running the pipeline
 The pipeline.py script must be run from within the same directory as the script, in and all scripts and 
 files should be left in their original positions within the directory.
